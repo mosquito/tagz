@@ -36,6 +36,9 @@ def test_tag_string_representation():
     assert tag.to_string(pretty=True) == (
         '<p>\n\tHello, World!\n\t<a href="/">\n\t\tgo to index\n\t</a>\n\t<i/>\n</p>\n'
     )
+    assert html.my_custom_tag is html.my_custom_tag
+    assert str(html.my_custom_tag()) == "<my-custom-tag/>"
+    assert str(html.my_custom_tag("test")) == "<my-custom-tag>test</my-custom-tag>"
 
 
 def test_html_generation(sample_html_page):

@@ -169,6 +169,7 @@ class HTML:
         self.__defaults: Mapping[str, Mapping[str, Any]] = MappingProxyType(defaults)
 
     def __getitem__(self, tag_name: str) -> Type[TagInstance]:
+        tag_name = tag_name.lower().replace("_", "-")
         return create_tag_class(tag_name, **self.__defaults.get(tag_name, {}))
 
     def __getattr__(self, tag_name: str) -> Type[TagInstance]:
