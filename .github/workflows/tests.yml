@@ -37,7 +37,6 @@ jobs:
 
       matrix:
         python:
-          - '3.7'
           - '3.8'
           - '3.9'
           - '3.10'
@@ -55,13 +54,13 @@ jobs:
           path: .venv
           key: venv-${{ runner.os }}-${{ github.job }}-${{ github.ref }}-${{ matrix.python }}
       - run: python -m pip install poetry
-      - name: pytest
+      - run: poetry install
+      - name: poetry run pytest
         run: >-
           poetry run pytest \
             -vv \
             --cov=tagz \
             --cov-report=term-missing \
-            --doctest-modules \
             tests
         env:
           FORCE_COLOR: 1
