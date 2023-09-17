@@ -132,7 +132,7 @@ class TagInstance(Tag):
 
 
 @lru_cache(None)
-def create_tag_class(tag_name: str, **defaults) -> Type[TagInstance]:
+def create_tag_class(tag_name: str, **defaults: Any) -> Type[TagInstance]:
     class_attrs = {"__tag_name__": tag_name}
     if defaults:
         class_attrs.update(defaults)
