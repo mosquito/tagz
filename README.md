@@ -49,7 +49,6 @@ print(page.to_html5(pretty=True))
 writes something like this:
 
 ```html
-/Users/mosquito/dev/python/tagz/.venv/bin/python /Users/mosquito/Library/Application Support/JetBrains/PyCharm2023.2/scratches/scratch_16.py 
 <!doctype html>
 <html lang="en">
 	<head>
