@@ -85,6 +85,50 @@ writes something like this:
 </html>
 ```
 
+# Features
+
+* Any custom tags is supported:
+  ```python
+  from tagz import html
+  assert str(html.my_custom_tag("hello")) == "<my-custom-tag>hello</my-custom-tag>" 
+  ```
+* Pretty printing html
+  ```python
+  from tagz import html
+
+  print(
+      html.div(
+         "Hello", html.strong("world"),
+      ).to_string(pretty=True)
+  )
+  #<div>
+  #	Hello
+  #	<strong>
+  #		world
+  #	</strong>
+  #</div>
+  ```
+* `Style` helper object:
+  ```python
+  from tagz import Style
+  assert str(Style(color="#ffffff")) == "color: #ffffff;"
+  ```
+* `StyleSheet` helper object
+  ```python
+  from tagz import Style, StyleSheet
+
+  # body {padding:"0";margin:"0"}
+  # a, div {transition:"opacity 600ms ease-in"}
+  print(
+      str(
+          StyleSheet({
+              "body": Style(padding="0", margin="0"),
+              ("div", "a"): Style(transition="opacity 600ms ease-in"),
+          })
+      )
+  )
+  ```
+
 # More examples
 
 ## Building page from parts
