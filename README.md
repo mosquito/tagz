@@ -11,7 +11,7 @@
 just with python code.
 
 ```python
-from tagz import html, Page
+from tagz import Page, StyleSheet, Style, html
 
 
 page = Page(
@@ -31,10 +31,13 @@ page = Page(
         html.meta(charset="utf-8"),
         html.meta(name="viewport", content="width=device-width, initial-scale=1"),
         html.title("tagz example page"),
-        html.link(href="/static/css/bootstrap.min.css"),
+        html.link(href="/static/css/bootstrap.min.css", rel="stylesheet"),
         html.script(src="/static/js/bootstrap.bundle.min.js"),
         html.style(
-            ".container, .container-fluid {transition:opacity 600ms ease-in;}"
+            StyleSheet({
+                "body": Style(padding="0", margin="0"),
+                ".container, .container-fluid": Style(transition="opacity 600ms ease-in"),
+            })
         )
     ),
 )
@@ -46,6 +49,7 @@ print(page.to_html5(pretty=True))
 writes something like this:
 
 ```html
+/Users/mosquito/dev/python/tagz/.venv/bin/python /Users/mosquito/Library/Application Support/JetBrains/PyCharm2023.2/scratches/scratch_16.py 
 <!doctype html>
 <html lang="en">
 	<head>
@@ -54,11 +58,12 @@ writes something like this:
 		<title>
 			tagz example page
 		</title>
-		<link href="/static/css/bootstrap.min.css"/>
+		<link href="/static/css/bootstrap.min.css" rel="stylesheet"/>
 		<script src="/static/js/bootstrap.bundle.min.js">
 		</script>
 		<style>
-			.container, .container-fluid {transition:opacity 600ms ease-in;}
+			body {padding:"0";margin:"0"}
+			.container, .container-fluid {transition:"opacity 600ms ease-in"}
 		</style>
 	</head>
 	<body>

@@ -1,5 +1,6 @@
 import pytest
-from tagz import Tag, html, Page, HTML
+
+from tagz import HTML, Page, Style, Tag, html, StyleSheet
 
 
 @pytest.fixture
@@ -23,7 +24,7 @@ def test_tag_creation():
     assert tag.name == "div"
     assert tag["id"] == "main"
 
-    tag = html.div(classes=['container'], id='main')
+    tag = html.div(classes=["container"], id="main")
     assert "container" in tag.classes
     assert tag.name == "div"
     assert tag["id"] == "main"
@@ -62,14 +63,14 @@ def test_tag_features():
     div.append(html.strong("hello"))
 
     assert str(div) == "<div><strong>hello</strong></div>"
-    div['id'] = "foo"
+    div["id"] = "foo"
 
-    assert div['id'] == "foo"
+    assert div["id"] == "foo"
     div["custom_attr"] = " custom value "
 
     div = html.div()
     div["custom"] = None
-    assert str(div) == '<div custom/>'
+    assert str(div) == "<div custom/>"
 
     div = html.div(classes=["foo", "bar"])
     assert str(div) == '<div class="bar foo"/>'
@@ -80,3 +81,26 @@ def test_tag_features():
     div = html.div("Hello")
     assert repr(div) == "<div>...</div>"
 
+
+def test_style():
+    assert str(Style(text_align="center", padding=0)) == 'padding: "0"; text-align: "center";'
+
+    style = Style()
+    assert str(style) == ''
+
+    style['padding'] = 0
+    assert str(style) == "padding: \"0\";"
+
+    style['margin'] = 0
+    assert str(style) == 'margin: "0"; padding: "0";'
+
+
+def test_stylesheet():
+    style_sheet = StyleSheet()
+    style_sheet['body'] = Style(background_color="#000000", color="#ffffff")
+    style_sheet[('div', 'a', 'table')] = Style(background_color="#111111", color="#cccccc")
+
+    assert str(style_sheet) == (
+        'body {background-color: "#000000"; color: "#ffffff";}\n'
+        'div, a, table {background-color: "#111111"; color: "#cccccc";}'
+    )

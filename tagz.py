@@ -5,14 +5,36 @@ from html import escape
 from itertools import chain
 from textwrap import indent
 from types import MappingProxyType
-from typing import Optional, Iterable, MutableSet, MutableMapping, List, Union, Mapping, Any, Type, Iterator
+from typing import (
+    Any, Dict, Iterable, Iterator, List, Mapping, MutableMapping, MutableSet,
+    Optional, Tuple, Type, Union,
+)
+
+
+class Style(Dict[str, Any]):
+    def __init__(self, *args: Any, **kwargs: Any):
+        kwargs = {key.replace("_", "-"): value for key, value in kwargs.items()}
+        super().__init__(*args, **kwargs)
+
+    def __str__(self) -> str:
+        return " ".join(f"{key}: \"{value}\";" for key, value in sorted(self.items()))
+
+
+class StyleSheet(Dict[Union[str, Tuple[str, ...]], Style]):
+    def __str__(self) -> str:
+        styles = []
+        for key, value in self.items():
+            if isinstance(key, tuple):
+                key = ", ".join(key)
+            styles.append(f"{key} {{{value}}}")
+        return "\n".join(styles)
 
 
 @dataclass(frozen=False)
 class Tag:
     name: str
     classes: MutableSet[str]
-    attributes: MutableMapping[str, Optional[str]]
+    attributes: MutableMapping[str, Union[str, None, Style]]
     children: List[Union["Tag", str]]
 
     def __init__(
@@ -20,11 +42,11 @@ class Tag:
         _tag_name: str,
         *_children: Union[str, "Tag"],
         classes: Iterable[str] = (),
-        **attributes: str
+        **attributes: Union[str, None, Style]
     ):
-        attrs: MutableMapping[str, Optional[str]] = {}
+        attrs: MutableMapping[str, Union[str, None, Style]] = {}
         for key, value in attributes.items():
-            attrs[key.replace('_', '-')] = escape(value)
+            attrs[key.replace("_", "-")] = escape(str(value))
 
         self.name = escape(_tag_name)
         self.classes = set(classes)
@@ -37,7 +59,7 @@ class Tag:
     def __setitem__(self, key: str, value: Optional[str]) -> None:
         self.attributes[escape(key)] = escape(value) if value is not None else None
 
-    def __getitem__(self, item: str) -> Optional[str]:
+    def __getitem__(self, item: str) -> Union[str, None, Style]:
         return self.attributes[escape(item)]
 
     def _format_attributes(self) -> str:
@@ -47,13 +69,13 @@ class Tag:
             if value is None:
                 parts.append(key)
                 continue
-            value = escape(value, quote=True)
+            value = escape(str(value), quote=True)
             parts.append(f"{key}=\"{value}\"")
         return " ".join(parts)
 
     def _format_classes(self) -> str:
         if not self.classes:
-            return ''
+            return ""
         return f"class=\"{' '.join(map(escape, sorted(self.classes)))}\""
 
     def __make_parts(self) -> Iterator[str]:
@@ -138,7 +160,7 @@ def create_tag_class(tag_name: str, **defaults: Any) -> Type[TagInstance]:
         class_attrs.update(defaults)
     return type(
         f"Tag{tag_name.title().replace('-', '')}",
-        (TagInstance,), class_attrs
+        (TagInstance,), class_attrs,
     )
 
 
@@ -154,7 +176,7 @@ class HTML:
 
 
 html = HTML({
-    "script": {"__default_children__": ("",)}
+    "script": {"__default_children__": ("",)},
 })
 
 
@@ -180,6 +202,8 @@ class Page:
 __all__ = (
     "HTML",
     "Page",
+    "Style",
+    "StyleSheet",
     "Tag",
     "TagInstance",
     "html",
