@@ -5,10 +5,9 @@
 [![Python Versions](https://img.shields.io/pypi/pyversions/tagz.svg)](https://pypi.python.org/pypi/tagz/)
 [![license](https://img.shields.io/pypi/l/tagz.svg)](https://pypi.python.org/pypi/tagz/)
 
-`tagz`
-======
+# `tagz`
 
-`tagz` is an extremely simple library for building html documents without using templates, 
+`tagz` – is an extremely simple library for building html documents without using templates, 
 just with python code.
 
 ```python
@@ -81,3 +80,100 @@ writes something like this:
 </html>
 ```
 
+# More examples
+
+## Building page from parts
+
+You can reuse the code, and assemble the page piece by piece, 
+to do this you can modify elements already added to the tags:
+
+```python
+from tagz import html, Page
+
+# Make an content element
+content = html.div(id='content')
+
+page = Page(
+    lang="en",
+    body_element=html.body(
+        html.h1("Example page"),
+        html.hr(),
+        # Adding it to the page
+        content,
+    ),
+    head_elements=(
+        html.meta(charset="utf-8"),
+        html.title("tagz partial page"),
+    ),
+)
+
+content.append("Example page content")
+
+print(page.to_html5(pretty=True))
+```
+
+This prints something like this:  
+
+```html
+<!doctype html>
+<html lang="en">
+	<head>
+		<meta charset="utf-8"/>
+		<title>
+			tagz example page
+		</title>
+	</head>
+	<body>
+		<h1>
+			Example page
+		</h1>
+		<hr/>
+		<div id="content">
+			Example page content
+		</div>
+	</body>
+</html>
+```
+
+## Convert CSV to html table
+
+```python
+from io import StringIO
+from urllib.request import urlopen
+from csv import reader
+from tagz import html, Page
+
+url = (
+    'https://media.githubusercontent.com/media/datablist/'
+    'sample-csv-files/main/files/organizations/'
+    'organizations-10000.csv'
+)
+
+csv = reader(StringIO(urlopen(url).read().decode()))
+table = html.table(border='1', style="border-collapse: collapse;")
+content = list(csv)
+
+# Make table header 
+table.append(html.tr(*map(html.th, content[0])))
+
+# Add table rows
+for csv_row in content[1:]:
+    table.append(html.tr(*map(html.td, csv_row)))
+
+page = Page(
+    lang="en",
+    body_element=html.body(
+        html.h1("Converted CSV"),
+        table,
+        "Content of this page has been automatically converted from",
+        html.a(url, href=url),
+    ),
+    head_elements=(
+        html.meta(charset="utf-8"),
+        html.title("tagz csv example page"),
+    ),
+)
+
+with open("/tmp/csv.html", "w") as fp:
+    fp.write(page.to_html5())
+```
