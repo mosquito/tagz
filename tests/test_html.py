@@ -83,16 +83,22 @@ def test_tag_features():
 
 
 def test_style():
-    assert str(Style(text_align="center", padding=0)) == 'padding: "0"; text-align: "center";'
+    assert str(Style(text_align="center", padding=0)) == 'padding: 0; text-align: center;'
 
     style = Style()
     assert str(style) == ''
 
     style['padding'] = 0
-    assert str(style) == "padding: \"0\";"
+    assert str(style) == "padding: 0;"
 
     style['margin'] = 0
-    assert str(style) == 'margin: "0"; padding: "0";'
+    assert str(style) == 'margin: 0; padding: 0;'
+
+    assert str(
+        html.div("red", style=Style(color="#ff0000"))
+    ) == (
+        '<div style="color: #ff0000;">red</div>'
+    )
 
 
 def test_stylesheet():
@@ -101,6 +107,6 @@ def test_stylesheet():
     style_sheet[('div', 'a', 'table')] = Style(background_color="#111111", color="#cccccc")
 
     assert str(style_sheet) == (
-        'body {background-color: "#000000"; color: "#ffffff";}\n'
-        'div, a, table {background-color: "#111111"; color: "#cccccc";}'
+        'body {background-color: #000000; color: #ffffff;}\n'
+        'div, a, table {background-color: #111111; color: #cccccc;}'
     )
