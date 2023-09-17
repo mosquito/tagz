@@ -17,7 +17,7 @@ class Style(Dict[str, Any]):
         super().__init__(*args, **kwargs)
 
     def __str__(self) -> str:
-        return " ".join(f"{key}: \"{value}\";" for key, value in sorted(self.items()))
+        return " ".join(f"{key}: {value};" for key, value in sorted(self.items()))
 
 
 class StyleSheet(Dict[Union[str, Tuple[str, ...]], Style]):

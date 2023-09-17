@@ -146,7 +146,7 @@ This prints something like this:
 from io import StringIO
 from urllib.request import urlopen
 from csv import reader
-from tagz import html, Page
+from tagz import html, Page, Style
 
 url = (
     'https://media.githubusercontent.com/media/datablist/'
@@ -155,7 +155,7 @@ url = (
 )
 
 csv = reader(StringIO(urlopen(url).read().decode()))
-table = html.table(border='1', style="border-collapse: collapse;")
+table = html.table(border='1', style=Style(border_collapse="collapse"))
 content = list(csv)
 
 # Make table header 
