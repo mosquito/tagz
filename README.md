@@ -1,6 +1,16 @@
 `tagz`
 ======
 
+[![Github Actions](https://github.com/mosquito/tagz/workflows/tests/badge.svg)](https://github.
+com/mosquito/tagz/actions?query=branch%3Amaster)
+[![Coveralls](https://coveralls.io/repos/github/mosquito/tagz/badge.svg?branch=master)](https://coveralls.
+io/github/mosquito/tagz?branch=master)
+[![Latest Version](https://img.shields.io/pypi/v/tagz.svg)](https://pypi.python.org/pypi/tagz/)
+[![python wheel](https://img.shields.io/pypi/wheel/tagz.svg)](https://pypi.python.org/pypi/tagz/)
+[![Python Versions](https://img.shields.io/pypi/pyversions/tagz.svg)](https://pypi.python.org/pypi/tagz/)
+[![license](https://img.shields.io/pypi/l/tagz.svg)](https://pypi.python.org/pypi/tagz/)
+
+
 `tagz` is an extremely simple library for building html documents without using templates, 
 just with python code.
 
