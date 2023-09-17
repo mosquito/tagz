@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "tagz"
-version = "0.1.1"
+version = "0.1.2"
 description = "tagz is a html tags builder"
 authors = ["Dmitry Orlov <me@mosquito.su>"]
 license = "MIT"
