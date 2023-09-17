@@ -36,7 +36,7 @@ page = Page(
         html.style(
             StyleSheet({
                 "body": Style(padding="0", margin="0"),
-                ".container, .container-fluid": Style(transition="opacity 600ms ease-in"),
+                (".container", ".container-fluid"): Style(transition="opacity 600ms ease-in"),
             })
         )
     ),
