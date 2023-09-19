@@ -61,8 +61,8 @@ writes something like this:
 		<script src="/static/js/bootstrap.bundle.min.js">
 		</script>
 		<style>
-			body {padding:"0";margin:"0"}
-			.container, .container-fluid {transition:"opacity 600ms ease-in"}
+			body {padding: 0; margin: 0;}
+			.container, .container-fluid {transition: opacity 600ms ease-in;}
 		</style>
 	</head>
 	<body>
@@ -116,8 +116,8 @@ writes something like this:
   ```python
   from tagz import Style, StyleSheet
 
-  # body {padding:"0";margin:"0"}
-  # a, div {transition:"opacity 600ms ease-in"}
+  # body {padding: 0;margin: 0}
+  # a, div {transition: opacity 600ms ease-in}
   print(
       str(
           StyleSheet({

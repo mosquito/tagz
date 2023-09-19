@@ -1,4 +1,5 @@
 import io
+from copy import copy
 from dataclasses import dataclass
 from functools import lru_cache
 from html import escape
@@ -34,8 +35,8 @@ class StyleSheet(Dict[Union[str, Tuple[str, ...]], Style]):
 class Tag:
     name: str
     classes: MutableSet[str]
-    attributes: MutableMapping[str, Union[str, None, Style]]
     children: List[Union["Tag", str]]
+    attributes: MutableMapping[str, Union[str, None, Style]]
 
     def __init__(
         self,
@@ -142,14 +143,29 @@ class TagInstance(Tag):
         self,
         *_children: Union[str, "Tag"],
         classes: Iterable[str] = (),
-        **attributes: str
+        **attributes: Union[str, None, Style]
     ):
+        attrs: Dict[str, Union[str, None, Style]] = (
+            dict(self.__default_attributes__ or {})
+        )
+        attrs.update(**attributes)
+        _children = tuple(
+            copy(item) for item in chain(self.__default_children__, _children)
+        )
+
         super().__init__(
             self.__tag_name__,
-            *chain(self.__default_children__, _children),
+            *_children,
             classes=classes,
-            **attributes,
-            **(self.__default_attributes__ or {})
+            **attrs
+        )
+
+    def __copy__(self) -> "TagInstance":
+        children = tuple(copy(item) for item in self.children)
+        return self.__class__(
+            *children,
+            classes=copy(self.classes),
+            **self.attributes
         )
 
 

@@ -1,3 +1,5 @@
+from copy import copy
+
 import pytest
 
 from tagz import HTML, Page, Style, Tag, html, StyleSheet
@@ -113,3 +115,15 @@ def test_stylesheet():
         'body {background-color: #000000; color: #ffffff;}\n'
         'div, a, table {background-color: #111111; color: #cccccc;}'
     )
+
+
+def test_tag_copy():
+    tag = html.div(name='foo')
+    clone = copy(tag)
+    clone['name'] = 'bar'
+
+    assert tag != clone
+    assert tag['name'] != clone['name']
+    assert tag['name'] == 'foo'
+    assert clone['name'] == 'bar'
+
