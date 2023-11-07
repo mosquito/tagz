@@ -2,7 +2,7 @@ from copy import copy
 
 import pytest
 
-from tagz import HTML, Page, Style, Tag, html, StyleSheet
+from tagz import HTML, Page, Style, StyleSheet, Tag, html
 
 
 @pytest.fixture
@@ -88,19 +88,19 @@ def test_tag_features():
 
 
 def test_style():
-    assert str(Style(text_align="center", padding=0)) == 'padding: 0; text-align: center;'
+    assert str(Style(text_align="center", padding=0)) == "padding: 0; text-align: center;"
 
     style = Style()
-    assert str(style) == ''
+    assert str(style) == ""
 
-    style['padding'] = 0
+    style["padding"] = 0
     assert str(style) == "padding: 0;"
 
-    style['margin'] = 0
-    assert str(style) == 'margin: 0; padding: 0;'
+    style["margin"] = 0
+    assert str(style) == "margin: 0; padding: 0;"
 
     assert str(
-        html.div("red", style=Style(color="#ff0000"))
+        html.div("red", style=Style(color="#ff0000")),
     ) == (
         '<div style="color: #ff0000;">red</div>'
     )
@@ -108,22 +108,22 @@ def test_style():
 
 def test_stylesheet():
     style_sheet = StyleSheet()
-    style_sheet['body'] = Style(background_color="#000000", color="#ffffff")
-    style_sheet[('div', 'a', 'table')] = Style(background_color="#111111", color="#cccccc")
+    style_sheet["body"] = Style(background_color="#000000", color="#ffffff")
+    style_sheet[("div", "a", "table")] = Style(background_color="#111111", color="#cccccc")
 
     assert str(style_sheet) == (
-        'body {background-color: #000000; color: #ffffff;}\n'
-        'div, a, table {background-color: #111111; color: #cccccc;}'
+        "body {background-color: #000000; color: #ffffff;}\n"
+        "div, a, table {background-color: #111111; color: #cccccc;}"
     )
 
 
 def test_tag_copy():
-    tag = html.div(name='foo')
+    tag = html.div(name="foo")
     clone = copy(tag)
-    clone['name'] = 'bar'
+    clone["name"] = "bar"
 
     assert tag != clone
-    assert tag['name'] != clone['name']
-    assert tag['name'] == 'foo'
-    assert clone['name'] == 'bar'
+    assert tag["name"] != clone["name"]
+    assert tag["name"] == "foo"
+    assert clone["name"] == "bar"
 

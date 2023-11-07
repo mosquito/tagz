@@ -1,4 +1,3 @@
-import io
 from copy import copy
 from dataclasses import dataclass
 from functools import lru_cache
@@ -24,7 +23,7 @@ class Style(Dict[str, Any]):
 class StyleSheet(Dict[Union[str, Tuple[str, ...]], Style]):
     def __str__(self) -> str:
         styles = []
-        for key, value in self.items():
+        for key, value in sorted(self.items(), key=str):
             if isinstance(key, tuple):
                 key = ", ".join(key)
             styles.append(f"{key} {{{value}}}")
@@ -97,41 +96,42 @@ class Tag:
             return f"<{' '.join(self.__make_parts())}/>"
 
     def __str__(self) -> str:
-        return self._to_string()
+        return self.to_string()
 
-    def _to_string(self) -> str:
-        with io.StringIO() as fp:
-            fp.write(f"<{' '.join(self.__make_parts())}")
-            if self.children:
-                fp.write(f">")
-                for child in self.children:
-                    fp.write(str(child))
-                fp.write(f"</{self.name}>")
-            else:
-                fp.write(f"/>")
-            return fp.getvalue()
+    def _to_string(self) -> List[str]:
+        parts = [f"<{' '.join(self.__make_parts())}"]
+        if self.children:
+            parts.append(">")
+            for child in self.children:
+                if isinstance(child, Tag):
+                    parts.extend(child._to_string())
+                else:
+                    parts.append(child)
+            parts.append(f"</{self.name}>")
+        else:
+            parts.append(f"/>")
+        return parts
 
-    def _to_pretty_string(self, _indent: str = "") -> str:
-        with io.StringIO() as fp:
-            fp.write(f"<{' '.join(self.__make_parts())}")
-            if self.children:
-                fp.write(f">\n")
-                for child in self.children:
-                    if isinstance(child, Tag):
-                        fp.write(child._to_pretty_string("\t"))
-                    else:
-                        child_str = str(child)
-                        if not child_str.strip():
-                            continue
-                        fp.write(indent(child_str, _indent if _indent else "\t"))
-                        fp.write(f"\n")
-                fp.write(f"</{self.name}>\n")
-            else:
-                fp.write(f"/>\n")
-            return indent(fp.getvalue(), _indent)
+    def _to_pretty_string(self, _indent: str = "") -> List[str]:
+        parts = [f"<{' '.join(self.__make_parts())}"]
+        if self.children:
+            parts.append(">\n")
+            for child in self.children:
+                if isinstance(child, Tag):
+                    parts.extend(child._to_pretty_string("\t"))
+                else:
+                    child_str = child.strip()
+                    if not child_str:
+                        continue
+                    parts.append(indent(child_str, _indent if _indent else "\t"))
+                    parts.append(f"\n")
+            parts.append(f"</{self.name}>\n")
+        else:
+            parts.append(f"/>\n")
+        return [indent("".join(parts), _indent)]
 
     def to_string(self, pretty: bool = False) -> str:
-        return self._to_pretty_string() if pretty else self._to_string()
+        return "".join(self._to_pretty_string() if pretty else self._to_string())
 
 
 class TagInstance(Tag):
@@ -210,10 +210,7 @@ class Page:
         self.html = html.html(self.head, self.body, *args, **kwargs)
 
     def to_html5(self, pretty: bool = False) -> str:
-        with io.StringIO() as fp:
-            fp.write(self.PREAMBLE)
-            fp.write(self.html.to_string(pretty=pretty))
-            return fp.getvalue()
+        return "".join((self.PREAMBLE, self.html.to_string(pretty=pretty)))
 
 
 __all__ = (
