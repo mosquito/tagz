@@ -174,7 +174,7 @@ def create_tag_class(tag_name: str, **defaults: Any) -> Type[TagInstance]:
     class_attrs = {"__tag_name__": tag_name}
     if defaults:
         class_attrs.update(defaults)
-    return type(
+    return type(    # type: ignore
         f"Tag{tag_name.title().replace('-', '')}",
         (TagInstance,), class_attrs,
     )
@@ -193,6 +193,7 @@ class HTML:
 
 
 html = HTML({
+    # script tag requires complete definition with closing tag
     "script": {"__default_children__": ("",)},
 })
 
