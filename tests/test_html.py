@@ -46,7 +46,7 @@ def test_tag_string_representation():
 def test_html_generation(sample_html_page):
     html_str = sample_html_page.to_html5()
     assert "<!doctype html>" in html_str
-    assert "<html lang=\"en\">" in html_str
+    assert '<html lang="en">' in html_str
     assert "<head>" in html_str
     assert "<title>Sample Page</title>" in html_str
     assert "<body>" in html_str
@@ -88,7 +88,9 @@ def test_tag_features():
 
 
 def test_style():
-    assert str(Style(text_align="center", padding=0)) == "padding: 0; text-align: center;"
+    assert (
+        str(Style(text_align="center", padding=0)) == "padding: 0; text-align: center;"
+    )
 
     style = Style()
     assert str(style) == ""
@@ -101,15 +103,15 @@ def test_style():
 
     assert str(
         html.div("red", style=Style(color="#ff0000")),
-    ) == (
-        '<div style="color: #ff0000;">red</div>'
-    )
+    ) == ('<div style="color: #ff0000;">red</div>')
 
 
 def test_stylesheet():
     style_sheet = StyleSheet()
     style_sheet["body"] = Style(background_color="#000000", color="#ffffff")
-    style_sheet[("div", "a", "table")] = Style(background_color="#111111", color="#cccccc")
+    style_sheet[("div", "a", "table")] = Style(
+        background_color="#111111", color="#cccccc"
+    )
 
     assert str(style_sheet) == (
         "body {background-color: #000000; color: #ffffff;}\n"
@@ -126,4 +128,3 @@ def test_tag_copy():
     assert tag["name"] != clone["name"]
     assert tag["name"] == "foo"
     assert clone["name"] == "bar"
-

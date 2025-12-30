@@ -88,9 +88,11 @@ writes something like this:
 
 `tagz` provides the following features:
 
-## Callable children and recursive evaluation
+## Callable children and attributes
 
-You can pass a function (callable) as a child to any tag. The function will be called once during rendering, and its return value (either a string or another tag) will be rendered in place. This allows for lazy or dynamic content generation, and supports recursive callables for deeply nested dynamic structures.
+You can pass a function (callable) as a child or as an attribute value to any tag. This allows for lazy or dynamic content generation.
+
+### Callable children
 
 <!-- name: test_callable_child -->
 ```python
@@ -115,23 +117,6 @@ tag = html.div(child_tag)
 assert str(tag) == "<div><span>world</span></div>"
 ```
 
-Or use recursive callables:
-
-<!-- name: test_callable_child_recursive -->
-```python
-from tagz import html
-# Recursive callable children
-def leaf():
-    return "leaf"
-def mid():
-    return html.b(leaf)
-def top():
-    return html.i(mid)
-
-tag = html.div(top)
-assert str(tag) == "<div><i><b>leaf</b></i></div>"
-```
-
 You can also use `append` with callables:
 
 <!-- name: test_callable_append -->
@@ -141,6 +126,21 @@ from tagz import html
 tag = html.div()
 tag.append(lambda: "foo")
 assert str(tag) == "<div>foo</div>"
+```
+
+### Callable attribute values
+
+You can use callables as attribute values. If the result is a not an string, it will be converted to string and escaped as an attribute value.
+
+<!-- name: test_callable_attrs -->
+```python
+from tagz import html
+
+def attr():
+    return "bar"
+
+tag = html.div(foo=attr)
+assert str(tag) == '<div foo="bar"/>', str(tag)
 ```
 
 ## Custom tags is supported

@@ -6,8 +6,19 @@ from itertools import chain
 from textwrap import indent
 from types import MappingProxyType
 from typing import (
-    Any, Dict, Iterable, Iterator, List, Mapping, MutableMapping, MutableSet,
-    Optional, Tuple, Type, Union, Callable,
+    Any,
+    Dict,
+    Iterable,
+    Iterator,
+    List,
+    Mapping,
+    MutableMapping,
+    MutableSet,
+    Optional,
+    Tuple,
+    Type,
+    Union,
+    Callable,
 )
 
 
@@ -35,18 +46,22 @@ class Tag:
     name: str
     classes: MutableSet[str]
     children: List[Union["Tag", str, Callable[[], Union["Tag", str]]]]
-    attributes: MutableMapping[str, Union[str, None, Style]]
+    attributes: MutableMapping[
+        str, Union[str, None, Style, Callable[[], Union[str, None, Style]]]
+    ]
 
     def __init__(
         self,
         _tag_name: str,
         *_children: Union[str, "Tag", Callable[[], Union["Tag", str]]],
         classes: Iterable[str] = (),
-        **attributes: Union[str, None, Style]
+        **attributes: Union[str, None, Style, Callable[[], Union[str, None, Style]]],
     ):
-        attrs: MutableMapping[str, Union[str, None, Style]] = {}
+        attrs: MutableMapping[
+            str, Union[str, None, Style, Callable[[], Union[str, None, Style]]]
+        ] = {}
         for key, value in attributes.items():
-            attrs[key.replace("_", "-")] = escape(str(value))
+            attrs[key.replace("_", "-")] = value
 
         self.name = escape(_tag_name)
         self.classes = set(classes)
@@ -56,27 +71,34 @@ class Tag:
     def append(self, other: Union["Tag", str, Callable[[], Union["Tag", str]]]) -> None:
         return self.children.append(other)
 
-    def __setitem__(self, key: str, value: Optional[str]) -> None:
-        self.attributes[escape(key)] = escape(value) if value is not None else None
+    def __setitem__(
+        self,
+        key: str,
+        value: Union[str, None, Style, Callable[[], Union[str, None, Style]]],
+    ) -> None:
+        self.attributes[escape(key)] = value
 
-    def __getitem__(self, item: str) -> Union[str, None, Style]:
+    def __getitem__(
+        self, item: str
+    ) -> Union[str, None, Style, Callable[[], Union[str, None, Style]]]:
         return self.attributes[escape(item)]
 
     def _format_attributes(self) -> str:
         parts = []
         for key, value in self.attributes.items():
             key = escape(key)
-            if value is None:
+            v = value() if callable(value) else value
+            if v is None:
                 parts.append(key)
                 continue
-            value = escape(str(value), quote=True)
-            parts.append(f"{key}=\"{value}\"")
+            v = escape(str(v), quote=True)
+            parts.append(f'{key}="{v}"')
         return " ".join(parts)
 
     def _format_classes(self) -> str:
         if not self.classes:
             return ""
-        return f"class=\"{' '.join(map(escape, sorted(self.classes)))}\""
+        return f'class="{" ".join(map(escape, sorted(self.classes)))}"'
 
     def __make_parts(self) -> Iterator[str]:
         yield self.name
@@ -103,10 +125,7 @@ class Tag:
         if self.children:
             parts.append(">")
             for child in self.children:
-                value = child
-                # Single recursive evaluation for callables
-                if callable(value):
-                    value = value()
+                value = child() if callable(child) else child
                 if isinstance(value, Tag):
                     parts.extend(value._to_string())
                 else:
@@ -121,9 +140,7 @@ class Tag:
         if self.children:
             parts.append(">\n")
             for child in self.children:
-                value = child
-                if callable(value):
-                    value = value()
+                value = child() if callable(child) else child
                 if isinstance(value, Tag):
                     parts.extend(value._to_pretty_string("\t"))
                 else:
@@ -150,30 +167,21 @@ class TagInstance(Tag):
         self,
         *_children: Union[str, "Tag", Callable[[], Union["Tag", str]]],
         classes: Iterable[str] = (),
-        **attributes: Union[str, None, Style]
+        **attributes: Union[str, None, Style],
     ):
-        attrs: Dict[str, Union[str, None, Style]] = (
-            dict(self.__default_attributes__ or {})
+        attrs: Dict[str, Union[str, None, Style]] = dict(
+            self.__default_attributes__ or {}
         )
         attrs.update(**attributes)
         _children = tuple(
             copy(item) for item in chain(self.__default_children__, _children)
         )
 
-        super().__init__(
-            self.__tag_name__,
-            *_children,
-            classes=classes,
-            **attrs
-        )
+        super().__init__(self.__tag_name__, *_children, classes=classes, **attrs)
 
     def __copy__(self) -> "TagInstance":
         children = tuple(copy(item) for item in self.children)
-        return self.__class__(
-            *children,
-            classes=copy(self.classes),
-            **self.attributes
-        )
+        return self.__class__(*children, classes=copy(self.classes), **self.attributes)
 
 
 @lru_cache(None)
@@ -183,7 +191,8 @@ def create_tag_class(tag_name: str, **defaults: Any) -> Type[TagInstance]:
         class_attrs.update(defaults)
     return type(
         f"Tag{tag_name.title().replace('-', '')}",
-        (TagInstance,), class_attrs,
+        (TagInstance,),
+        class_attrs,
     )
 
 
@@ -199,19 +208,23 @@ class HTML:
         return self[tag_name.replace("_", "-")]
 
 
-html = HTML({
-    # script tag requires complete definition with closing tag
-    "script": {"__default_children__": ("",)},
-})
+html = HTML(
+    {
+        # script tag requires complete definition with closing tag
+        "script": {"__default_children__": ("",)},
+    }
+)
 
 
 class Page:
     PREAMBLE: str = "<!doctype html>\n"
 
     def __init__(
-        self, body_element: Optional[Tag] = None,
+        self,
+        body_element: Optional[Tag] = None,
         head_elements: Iterable[Tag] = (),
-        *args: Union[str, "Tag"], **kwargs: str
+        *args: Union[str, "Tag"],
+        **kwargs: str,
     ):
         self.body = body_element or html.body()
         self.head = html.head(*head_elements)
