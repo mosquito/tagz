@@ -50,7 +50,7 @@ def test_callable_attribute_value():
 
     tag = html.div(foo=value)
     # The callable is evaluated once and its result is escaped
-    expected = f'<div foo="{escape("bar", quote=True)}"/>'
+    expected = f'<div foo="{escape("bar", quote=True)}"></div>'
     result = str(tag)
     assert result == expected
     assert calls == [1], (
@@ -93,11 +93,11 @@ def test_attr_tag_not_supported():
 
 def test_unescaped_attribute():
     tag = html.div(foo=123)
-    assert str(tag) == '<div foo="123"/>'
+    assert str(tag) == '<div foo="123"></div>'
     tag = html.div(foo=None)
-    assert str(tag) == "<div foo/>"
+    assert str(tag) == "<div foo></div>"
     tag = html.div(foo=True)
-    assert str(tag) == '<div foo="True"/>'
+    assert str(tag) == '<div foo="True"></div>'
     tag = html.div(foo="<b>unsafe</b>")
     # All attribute values must be escaped
-    assert str(tag) == '<div foo="&lt;b&gt;unsafe&lt;/b&gt;"/>'
+    assert str(tag) == '<div foo="&lt;b&gt;unsafe&lt;/b&gt;"></div>'
