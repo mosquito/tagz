@@ -84,13 +84,49 @@ writes something like this:
 </html>
 ```
 
+
 # Features
+* **Callable children and recursive evaluation**:
+  You can pass a function (callable) as a child to any tag. The function will be called once during rendering, and its return value (either a string or another tag) will be rendered in place. This allows for lazy or dynamic content generation, and supports recursive callables for deeply nested dynamic structures.
+  
+  ```python
+  from tagz import Tag, html
+
+  # Simple callable child returning a string
+  def child():
+      return "hello"
+  tag = Tag("div", child)
+  assert str(tag) == "<div>hello</div>"
+
+  # Callable child returning a tag
+  def child_tag():
+      return html.span("world")
+  tag = Tag("div", child_tag)
+  assert str(tag) == "<div><span>world</span></div>"
+
+  # Recursive callable children
+  def leaf():
+      return "leaf"
+  def mid():
+      return html.b(leaf)
+  def top():
+      return html.i(mid)
+  tag = Tag("div", top)
+  assert str(tag) == "<div><i><b>leaf</b></i></div>"
+  ```
+
+  You can also use `append` with callables:
+  ```python
+  tag = Tag("div")
+  tag.append(lambda: "foo")
+  assert str(tag) == "<div>foo</div>"
+  ```
 
 * Any custom tags is supported:
-  ```python
-  from tagz import html
-  assert str(html.my_custom_tag("hello")) == "<my-custom-tag>hello</my-custom-tag>" 
-  ```
+    ```python
+    from tagz import html
+    assert str(html.my_custom_tag("hello")) == "<my-custom-tag>hello</my-custom-tag>" 
+    ```
 * Pretty printing html
   ```python
   from tagz import html
