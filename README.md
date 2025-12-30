@@ -1,4 +1,4 @@
-[![Github Actions](https://github.com/mosquito/tagz/workflows/tests/badge.svg)](https://github.com/mosquito/tagz/actions?query=branch%3Amaster)
+[![tests](https://github.com/mosquito/tagz/actions/workflows/tests.yml/badge.svg)](https://github.com/mosquito/tagz/actions/workflows/tests.yml)
 [![Coveralls](https://coveralls.io/repos/github/mosquito/tagz/badge.svg?branch=master)](https://coveralls.io/github/mosquito/tagz?branch=master)
 [![Latest Version](https://img.shields.io/pypi/v/tagz.svg)](https://pypi.python.org/pypi/tagz/)
 [![python wheel](https://img.shields.io/pypi/wheel/tagz.svg)](https://pypi.python.org/pypi/tagz/)
@@ -84,85 +84,123 @@ writes something like this:
 </html>
 ```
 
-
 # Features
-* **Callable children and recursive evaluation**:
-  You can pass a function (callable) as a child to any tag. The function will be called once during rendering, and its return value (either a string or another tag) will be rendered in place. This allows for lazy or dynamic content generation, and supports recursive callables for deeply nested dynamic structures.
-  
-  ```python
-  from tagz import Tag, html
 
-  # Simple callable child returning a string
-  def child():
-      return "hello"
-  tag = Tag("div", child)
-  assert str(tag) == "<div>hello</div>"
+`tagz` provides the following features:
 
-  # Callable child returning a tag
-  def child_tag():
-      return html.span("world")
-  tag = Tag("div", child_tag)
-  assert str(tag) == "<div><span>world</span></div>"
+## Callable children and recursive evaluation
 
-  # Recursive callable children
-  def leaf():
-      return "leaf"
-  def mid():
-      return html.b(leaf)
-  def top():
-      return html.i(mid)
-  tag = Tag("div", top)
-  assert str(tag) == "<div><i><b>leaf</b></i></div>"
-  ```
+You can pass a function (callable) as a child to any tag. The function will be called once during rendering, and its return value (either a string or another tag) will be rendered in place. This allows for lazy or dynamic content generation, and supports recursive callables for deeply nested dynamic structures.
 
-  You can also use `append` with callables:
-  ```python
-  tag = Tag("div")
-  tag.append(lambda: "foo")
-  assert str(tag) == "<div>foo</div>"
-  ```
+<!-- name: test_callable_child -->
+```python
+from tagz import html
 
-* Any custom tags is supported:
-    ```python
-    from tagz import html
-    assert str(html.my_custom_tag("hello")) == "<my-custom-tag>hello</my-custom-tag>" 
-    ```
-* Pretty printing html
-  ```python
-  from tagz import html
+def child():
+    return "hello"
 
-  print(
-      html.div(
-         "Hello", html.strong("world"),
-      ).to_string(pretty=True)
-  )
-  #<div>
-  #	Hello
-  #	<strong>
-  #		world
-  #	</strong>
-  #</div>
-  ```
-* `Style` helper object:
-  ```python
-  from tagz import Style
-  assert str(Style(color="#ffffff")) == "color: #ffffff;"
-  ```
-* `StyleSheet` helper object
-  ```python
-  from tagz import Style, StyleSheet
+tag = html.div(child)
+assert str(tag) == "<div>hello</div>"
+```
 
-  # body {padding: 0;margin: 0}
-  # a, div {transition: opacity 600ms ease-in}
-  print(
-      str(
-          StyleSheet({
-              "body": Style(padding="0", margin="0"),
-              ("div", "a"): Style(transition="opacity 600ms ease-in"),
-          })
-      )
-  )
-  ```
+Or return another tag:
+
+<!-- name: test_callable_child -->
+```python
+# Callable child returning a tag
+def child_tag():
+    return html.span("world")
+
+tag = html.div(child_tag)
+assert str(tag) == "<div><span>world</span></div>"
+```
+
+Or use recursive callables:
+
+<!-- name: test_callable_child_recursive -->
+```python
+from tagz import html
+# Recursive callable children
+def leaf():
+    return "leaf"
+def mid():
+    return html.b(leaf)
+def top():
+    return html.i(mid)
+
+tag = html.div(top)
+assert str(tag) == "<div><i><b>leaf</b></i></div>"
+```
+
+You can also use `append` with callables:
+
+<!-- name: test_callable_append -->
+```python
+from tagz import html
+
+tag = html.div()
+tag.append(lambda: "foo")
+assert str(tag) == "<div>foo</div>"
+```
+
+## Custom tags is supported
+
+Add custom tags by using underscore `_` in the name:
+
+<!-- name: test_custom_tag -->
+```python
+from tagz import html
+assert str(html.my_custom_tag("hello")) == "<my-custom-tag>hello</my-custom-tag>" 
+```
+
+## Pretty printing html
+
+You can pretty print the html output with `to_string(pretty=True)` or `to_html5(pretty=True)` methods:
+
+```python
+from tagz import html
+
+print(
+    html.div(
+        "Hello", html.strong("world"),
+    ).to_string(pretty=True)
+)
+#<div>
+#	Hello
+#	<strong>
+#		world
+#	</strong>
+#</div>
+```
+
+## `Style` and `StyleSheet` helper objects
+
+`Style` helper object encapsulating css styles:
+
+<!-- name: test_custom_tag -->
+```python
+from tagz import Style
+assert str(Style(color="#ffffff")) == "color: #ffffff;"
+```
+
+
+`StyleSheet` helper object encapsulating css stylesheet:
+
+<!-- name: test_stylesheet -->
+```python
+from tagz import Style, StyleSheet
+
+# body {padding: 0;margin: 0}
+# a, div {transition: opacity 600ms ease-in}
+print(
+    str(
+        StyleSheet({
+            "body": Style(padding="0", margin="0"),
+            ("div", "a"): Style(transition="opacity 600ms ease-in"),
+        })
+    )
+)
+```
 
 # More examples
 

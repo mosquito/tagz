@@ -148,7 +148,7 @@ class TagInstance(Tag):
 
     def __init__(
         self,
-        *_children: Union[str, "Tag"],
+        *_children: Union[str, "Tag", Callable[[], Union["Tag", str]]],
         classes: Iterable[str] = (),
         **attributes: Union[str, None, Style]
     ):
@@ -181,7 +181,7 @@ def create_tag_class(tag_name: str, **defaults: Any) -> Type[TagInstance]:
     class_attrs = {"__tag_name__": tag_name}
     if defaults:
         class_attrs.update(defaults)
-    return type(    # type: ignore
+    return type(
         f"Tag{tag_name.title().replace('-', '')}",
         (TagInstance,), class_attrs,
     )
