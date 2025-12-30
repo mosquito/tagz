@@ -34,12 +34,12 @@ def test_tag_creation():
 
 def test_tag_string_representation():
     tag = html.p("Hello, World!", html.a("go to index", "", href="/"), html.i())
-    assert str(tag) == '<p>Hello, World!<a href="/">go to index</a><i/></p>'
+    assert str(tag) == '<p>Hello, World!<a href="/">go to index</a><i></i></p>'
     assert tag.to_string(pretty=True) == (
-        '<p>\n\tHello, World!\n\t<a href="/">\n\t\tgo to index\n\t</a>\n\t<i/>\n</p>\n'
+        '<p>\n\tHello, World!\n\t<a href="/">\n\t\tgo to index\n\t</a>\n\t<i>\n\t</i>\n</p>\n'
     )
     assert html.my_custom_tag is html.my_custom_tag
-    assert str(html.my_custom_tag()) == "<my-custom-tag/>"
+    assert str(html.my_custom_tag()) == "<my-custom-tag></my-custom-tag>"
     assert str(html.my_custom_tag("test")) == "<my-custom-tag>test</my-custom-tag>"
 
 
@@ -64,7 +64,7 @@ def test_html_class_factory():
 def test_tag_features():
     div = html.div()
 
-    assert str(div) == "<div/>"
+    assert str(div) == "<div></div>"
     div.append(html.strong("hello"))
 
     assert str(div) == "<div><strong>hello</strong></div>"
@@ -75,13 +75,13 @@ def test_tag_features():
 
     div = html.div()
     div["custom"] = None
-    assert str(div) == "<div custom/>"
+    assert str(div) == "<div custom></div>"
 
     div = html.div(classes=["foo", "bar"])
-    assert str(div) == '<div class="bar foo"/>'
+    assert str(div) == '<div class="bar foo"></div>'
 
     div = html.div()
-    assert repr(div) == "<div/>"
+    assert repr(div) == "<div></div>"
 
     div = html.div("Hello")
     assert repr(div) == "<div>...</div>"
@@ -128,3 +128,98 @@ def test_tag_copy():
     assert tag["name"] != clone["name"]
     assert tag["name"] == "foo"
     assert clone["name"] == "bar"
+
+def test_void_tags():
+    br = html.br()
+    assert str(br) == "<br/>"
+    assert repr(br) == "<br/>"
+
+    img = html.img(src="image.png", alt="An image")
+    assert str(img) == '<img alt="An image" src="image.png"/>'
+    assert repr(img) == '<img alt="An image" src="image.png"/>'
+
+    with pytest.raises(ValueError):
+        html.img("This should not be allowed in a void tag")
+    
+    tag = html.br()
+    with pytest.raises(ValueError):
+        tag.append(html.span("Not allowed"))
+
+
+def test_stylesheets():
+    style = StyleSheet({
+        "body": Style(margin="0", padding="0"),
+        (".container", ".container-fluid"): Style(transition="opacity 600ms ease-in"),
+    })
+    assert str(style) == (
+        "body {margin: 0; padding: 0;}\n"
+        ".container, .container-fluid {transition: opacity 600ms ease-in;}"
+    )
+
+
+TEST_PAGE = """
+<!doctype html>
+<html lang="en">
+\t<head>
+\t\t<meta charset="utf-8"/>
+\t\t<meta content="width=device-width, initial-scale=1" name="viewport"/>
+\t\t<title>
+\t\t\ttagz example page
+\t\t</title>
+\t\t<link href="/static/css/bootstrap.min.css" rel="stylesheet"/>
+\t\t<script src="/static/js/bootstrap.bundle.min.js">
+\t\t</script>
+\t\t<style>
+\t\t\tbody {margin: 0; padding: 0;}
+\t\t\t.container, .container-fluid {transition: opacity 600ms ease-in;}
+\t\t</style>
+\t</head>
+\t<body>
+\t\t<h1>
+\t\t\tHello
+\t\t</h1>
+\t\t<div>
+\t\t\t<strong>
+\t\t\t\tworld
+\t\t\t</strong>
+\t\t</div>
+\t\t<a href="https://example.com/">
+\t\t\texample link
+\t\t\t<i>
+\t\t\t\twith italic text
+\t\t\t</i>
+\t\t</a>
+\t</body>
+</html>
+"""
+
+def test_webpage():
+    page = Page(
+        lang="en",
+        body_element=html.body(
+            html.h1("Hello"),
+            html.div(
+                html.strong("world"),
+            ),
+            html.a(
+                "example link",
+                html.i("with italic text"),
+                href="https://example.com/"
+            ),
+        ),
+        head_elements=(
+            html.meta(charset="utf-8"),
+            html.meta(name="viewport", content="width=device-width, initial-scale=1"),
+            html.title("tagz example page"),
+            html.link(href="/static/css/bootstrap.min.css", rel="stylesheet"),
+            html.script(src="/static/js/bootstrap.bundle.min.js"),
+            html.style(
+                StyleSheet({
+                    "body": Style(padding="0", margin="0"),
+                    (".container", ".container-fluid"): Style(transition="opacity 600ms ease-in"),
+                })
+            )
+        ),
+    )
+
+    assert page.to_html5(True).strip() == TEST_PAGE.strip()

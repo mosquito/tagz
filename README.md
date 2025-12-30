@@ -10,6 +10,7 @@
 `tagz` – is an extremely simple library for building html documents without using templates, 
 just with python code.
 
+<!-- name: test_page_render -->
 ```python
 from tagz import Page, StyleSheet, Style, html
 
@@ -53,7 +54,7 @@ writes something like this:
 <html lang="en">
 	<head>
 		<meta charset="utf-8"/>
-		<meta name="viewport" content="width=device-width, initial-scale=1"/>
+		<meta content="width=device-width, initial-scale=1" name="viewport"/>
 		<title>
 			tagz example page
 		</title>
@@ -61,7 +62,7 @@ writes something like this:
 		<script src="/static/js/bootstrap.bundle.min.js">
 		</script>
 		<style>
-			body {padding: 0; margin: 0;}
+			body {margin: 0; padding: 0;}
 			.container, .container-fluid {transition: opacity 600ms ease-in;}
 		</style>
 	</head>
@@ -109,6 +110,8 @@ Or return another tag:
 
 <!-- name: test_callable_child -->
 ```python
+from tagz import html
+
 # Callable child returning a tag
 def child_tag():
     return html.span("world")
@@ -140,7 +143,7 @@ def attr():
     return "bar"
 
 tag = html.div(foo=attr)
-assert str(tag) == '<div foo="bar"/>', str(tag)
+assert str(tag) == '<div foo="bar"></div>', str(tag)
 ```
 
 ## Custom tags is supported
