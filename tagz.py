@@ -7,7 +7,7 @@ from textwrap import indent
 from types import MappingProxyType
 from typing import (
     Any, Dict, Iterable, Iterator, List, Mapping, MutableMapping, MutableSet,
-    Optional, Tuple, Type, Union,
+    Optional, Tuple, Type, Union, Callable,
 )
 
 
@@ -34,13 +34,13 @@ class StyleSheet(Dict[Union[str, Tuple[str, ...]], Style]):
 class Tag:
     name: str
     classes: MutableSet[str]
-    children: List[Union["Tag", str]]
+    children: List[Union["Tag", str, Callable[[], Union["Tag", str]]]]
     attributes: MutableMapping[str, Union[str, None, Style]]
 
     def __init__(
         self,
         _tag_name: str,
-        *_children: Union[str, "Tag"],
+        *_children: Union[str, "Tag", Callable[[], Union["Tag", str]]],
         classes: Iterable[str] = (),
         **attributes: Union[str, None, Style]
     ):
@@ -53,7 +53,7 @@ class Tag:
         self.attributes = attrs
         self.children = list(_children)
 
-    def append(self, other: Union["Tag", str]) -> None:
+    def append(self, other: Union["Tag", str, Callable[[], Union["Tag", str]]]) -> None:
         return self.children.append(other)
 
     def __setitem__(self, key: str, value: Optional[str]) -> None:
@@ -103,10 +103,14 @@ class Tag:
         if self.children:
             parts.append(">")
             for child in self.children:
-                if isinstance(child, Tag):
-                    parts.extend(child._to_string())
+                value = child
+                # Single recursive evaluation for callables
+                if callable(value):
+                    value = value()
+                if isinstance(value, Tag):
+                    parts.extend(value._to_string())
                 else:
-                    parts.append(child)
+                    parts.append(value)
             parts.append(f"</{self.name}>")
         else:
             parts.append(f"/>")
@@ -117,10 +121,13 @@ class Tag:
         if self.children:
             parts.append(">\n")
             for child in self.children:
-                if isinstance(child, Tag):
-                    parts.extend(child._to_pretty_string("\t"))
+                value = child
+                if callable(value):
+                    value = value()
+                if isinstance(value, Tag):
+                    parts.extend(value._to_pretty_string("\t"))
                 else:
-                    child_str = child.strip()
+                    child_str = str(value).strip()
                     if not child_str:
                         continue
                     parts.append(indent(child_str, _indent if _indent else "\t"))
@@ -141,7 +148,7 @@ class TagInstance(Tag):
 
     def __init__(
         self,
-        *_children: Union[str, "Tag"],
+        *_children: Union[str, "Tag", Callable[[], Union["Tag", str]]],
         classes: Iterable[str] = (),
         **attributes: Union[str, None, Style]
     ):
@@ -174,7 +181,7 @@ def create_tag_class(tag_name: str, **defaults: Any) -> Type[TagInstance]:
     class_attrs = {"__tag_name__": tag_name}
     if defaults:
         class_attrs.update(defaults)
-    return type(    # type: ignore
+    return type(
         f"Tag{tag_name.title().replace('-', '')}",
         (TagInstance,), class_attrs,
     )
