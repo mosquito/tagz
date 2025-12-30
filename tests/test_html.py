@@ -138,6 +138,13 @@ def test_void_tags():
     assert str(img) == '<img alt="An image" src="image.png"/>'
     assert repr(img) == '<img alt="An image" src="image.png"/>'
 
+    with pytest.raises(ValueError):
+        html.img("This should not be allowed in a void tag")
+    
+    tag = html.br()
+    with pytest.raises(ValueError):
+        tag.append(html.span("Not allowed"))
+
 
 def test_stylesheets():
     style = StyleSheet({
