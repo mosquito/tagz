@@ -302,3 +302,40 @@ page = Page(
 with open("/tmp/csv.html", "w") as fp:
     fp.write(page.to_html5())
 ```
+
+## Data URI helpers
+
+You can embed binary data directly in HTML attributes using `data_uri` and `open_data_uri`:
+
+<!-- name: test_data_uri -->
+```python
+from tagz import data_uri
+
+src = data_uri(b"hello world", media_type="text/plain")
+assert src == "data:text/plain;base64,aGVsbG8gd29ybGQ="
+```
+
+Or use `open_data_uri` to read and encode a file directly:
+
+<!-- name: test_open_data_uri -->
+```python
+from tempfile import NamedTemporaryFile
+from tagz import open_data_uri, html
+
+with NamedTemporaryFile("wb", suffix=".png") as f:
+    # Write a minimal PNG file
+    f.write(b"\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00\x01"
+            b"\x00\x00\x00\x01\x08\x06\x00\x00\x00\x1f\x15\xc4"
+            b"\x89\x00\x00\x00\nIDATx\xdac\xf8\x0f\x00\x01\x01"
+            b"\x01\x00\x18\xdd\x03\xe2\x00\x00\x00\x00IEND\xaeB`\x82")
+    f.flush()
+    f.seek(0)
+
+    src = open_data_uri(f.name, media_type="image/png")
+    img_tag = html.img(src=src, alt="Nothing")
+    assert str(img_tag).startswith(
+        '<img alt="Nothing" src="data:image/png;base64,'
+        'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcS'
+        'JAAAACklEQVR42mP4DwABAQEAGN0D4gAAAABJRU5ErkJggg=='
+    )
+```
