@@ -167,11 +167,11 @@ class TagInstance(Tag):
         self,
         *_children: Union[str, "Tag", Callable[[], Union["Tag", str]]],
         classes: Iterable[str] = (),
-        **attributes: Union[str, None, Style],
+        **attributes: Union[str, None, Style, Callable[[], Union[str, None, Style]]],
     ):
-        attrs: Dict[str, Union[str, None, Style]] = dict(
-            self.__default_attributes__ or {}
-        )
+        attrs: Dict[
+            str, Union[str, None, Style, Callable[[], Union[str, None, Style]]]
+        ] = dict(self.__default_attributes__ or {})
         attrs.update(**attributes)
         _children = tuple(
             copy(item) for item in chain(self.__default_children__, _children)
