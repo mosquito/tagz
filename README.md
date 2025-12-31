@@ -205,6 +205,56 @@ print(
 )
 ```
 
+## Controlling Attribute Absence
+
+You can use the special value `ABSENT` to dynamically remove an attribute from a tag. This is useful for callables that may want to omit an attribute based on logic.
+
+<!-- name: test_absent_attr -->
+```python
+from tagz import html, ABSENT
+
+present = True
+
+def attr():
+     return "value" if present else ABSENT
+
+tag = html.div(test=attr)
+assert str(tag) == '<div test="value"></div>'
+
+present = False
+assert str(tag) == "<div></div>"
+```
+
+## Raw Content in Script and Style
+
+Content inside `<script>` and `<style>` tags is not escaped by default. This allows you to embed raw JS/CSS.
+
+<!-- name: test_raw_script_style -->
+```python
+from tagz import html
+
+style = html.style("body {margin: 0; padding: 0;}")
+assert str(style) == "<style>body {margin: 0; padding: 0;}</style>"
+
+script = html.script('''console.log(1 > 2 && 3 < 2 && "0" === '0');''')
+assert str(script) == '''<script>console.log(1 > 2 && 3 < 2 && "0" === '0');</script>'''
+```
+
+## Classes API Improvements
+
+The `classes` property supports assignment via set, list, tuple, or space-separated string, and raises a `TypeError` for invalid types.
+
+<!-- name: test_classes_setter -->
+```python
+from tagz import html
+
+tag = html.div()
+tag.classes = "foo bar"
+assert tag.classes == {"foo", "bar"}
+tag.classes = ["baz"]
+assert tag.classes == {"baz"}
+```
+
 # More examples
 
 ## Building page from parts
