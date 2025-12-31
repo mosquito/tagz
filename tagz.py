@@ -6,7 +6,6 @@ from functools import lru_cache
 from html import escape
 from pathlib import Path
 from itertools import chain
-from textwrap import indent
 from types import MappingProxyType
 from typing import (
     Any,
@@ -160,7 +159,7 @@ class Tag:
             return ""
         return f'class="{" ".join(sorted(self.classes))}"'
 
-    def __make_parts(self) -> Iterator[str]:
+    def _make_parts(self) -> Iterator[str]:
         yield self.name
         classes = self._format_classes()
 
@@ -171,56 +170,82 @@ class Tag:
         if attributes:
             yield attributes
 
+    def _format_tag_open(self) -> Iterable[str]:
+        yield "<"
+        yield ' '.join(self._make_parts())
+        if self._void:
+            yield "/>"
+            return
+        yield ">"
+
+    def _format_tag_close(self) -> Iterable[str]:
+        if self._void:
+            return
+        yield f"</{self.name}>"
+
     def __repr__(self) -> str:
-        if not self._void:
-            return f"<{' '.join(self.__make_parts())}>{'...' if self.children else ''}</{self.name}>"
-        else:
-            return f"<{' '.join(self.__make_parts())}/>"
+        parts = ["".join(self._format_tag_open())]
+        if self._void:
+            parts.append("".join(self._format_tag_close()))
+            return "".join(parts)
+
+        parts.append(f"{'...' if self.children else ''}")
+        parts.append(f"</{self.name}>")
+        return "".join(parts)
 
     def __str__(self) -> str:
         return self.to_string()
 
-    def _to_string(self) -> List[str]:
-        parts = [f"<{' '.join(self.__make_parts())}"]
-        if self._void:
-            parts.append(f"/>")
-            return parts
+    def _to_string(self, indent="", indent_str="") -> Iterable[str]:
+        yield indent
+        yield from self._format_tag_open()
 
-        parts.append(">")
+        if indent_str:
+            yield "\n"
+
+        if self._void:
+            yield from self._format_tag_close()
+            return
+
         for child in self.children:
             if callable(child):
                 child = child()
                 if isinstance(child, str) and self._escaped:
                     child = escape(child)
+
             if isinstance(child, Tag):
-                parts.extend(child._to_string())
+                yield from child._to_string(indent + indent_str, indent_str)
             else:
-                parts.append(str(child))
-        parts.append(f"</{self.name}>")
-        return parts
-
-    def _to_pretty_string(self, _indent: str = "") -> List[str]:
-        parts = [f"<{' '.join(self.__make_parts())}"]
-        if self._void:
-            parts.append(f"/>\n")
-            return [indent("".join(parts), _indent)]
-
-        parts.append(">\n")
-        for child in self.children:
-            value = child() if callable(child) else child
-            if isinstance(value, Tag):
-                parts.extend(value._to_pretty_string("\t"))
-            else:
-                child_str = str(value)
+                child_str = str(child)
                 if not child_str:
+                    # Only output non-empty strings
                     continue
-                parts.append(indent(child_str, _indent if _indent else "\t"))
-                parts.append(f"\n")
-        parts.append(f"</{self.name}>\n")
-        return [indent("".join(parts), _indent)]
+
+                if indent_str and '\n' in child_str:
+                    # Handle multi-line strings in pretty mode
+                    lines = child_str.split('\n')
+                    for line in lines:
+                        yield indent
+                        yield indent_str
+                        yield line
+                        yield "\n"
+                    continue
+
+                yield indent
+                yield indent_str
+                yield child_str
+                if indent_str:
+                    yield "\n"
+        yield indent
+        yield from self._format_tag_close()
+        if indent_str:
+            yield "\n"
+
+    def iter_string(self, pretty: bool = False) -> Iterator[str]:
+        yield from self._to_string("", "\t" if pretty else "")
 
     def to_string(self, pretty: bool = False) -> str:
-        return "".join(self._to_pretty_string() if pretty else self._to_string())
+        return "".join(self.iter_string(pretty=pretty))
 
 
 class TagInstance(Tag):
@@ -278,6 +303,26 @@ class HTML:
 
     def __getattr__(self, tag_name: str) -> Type[TagInstance]:
         return self[tag_name.replace("_", "-")]
+
+
+class Raw(Tag):
+    """
+    A Tag that renders raw, unwrapped content.
+    It is completely unescaped and really unsafe against XSS.
+    The best practice is to avoid using this unless absolutely necessary.
+    """
+
+    def __init__(self, content: str):
+        super().__init__("", content, _escaped=False)
+
+    def _format_tag_open(self):
+        yield ""
+    
+    def _format_tag_close(self):
+        yield ""
+
+    def _to_string(self, indent="", indent_str=""):
+        return super()._to_string("", "")
 
 
 _void = MappingProxyType({"__void__": True})
@@ -370,4 +415,5 @@ __all__ = (
     "data_uri",
     "open_data_uri",
     "ABSENT",
+    "Raw",
 )

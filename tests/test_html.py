@@ -2,7 +2,7 @@ from copy import copy
 
 import pytest
 
-from tagz import HTML, Page, Style, StyleSheet, Tag, html, ABSENT
+from tagz import HTML, Page, Style, StyleSheet, Tag, html, ABSENT, Raw
 
 
 @pytest.fixture
@@ -393,3 +393,12 @@ def test_webpage():
     )
 
     assert page.to_html5(True).strip() == TEST_PAGE.strip()
+
+def test_raw():
+    raw = Raw("<div>raw content & more</div>")
+    assert str(raw) == "<div>raw content & more</div>"
+
+    container = html.div(raw)
+    assert str(container) == "<div><div>raw content & more</div></div>"
+
+    assert raw.to_string(pretty=True) == "<div>raw content & more</div>"
