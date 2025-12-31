@@ -244,6 +244,50 @@ class Tag:
     def iter_string(self, pretty: bool = False) -> Iterator[str]:
         yield from self._to_string("", "\t" if pretty else "")
 
+    def iter_lines(self, indent_char: str = "\t") -> Iterator[str]:
+        """
+        Iterate over the pretty-printed HTML output line by line.
+
+        This method always formats with indentation and yields complete lines
+        without trailing newlines. Useful for streaming HTML output line by line
+        to files or network sockets.
+
+        Args:
+            indent_char: The character(s) to use for indentation. Defaults to tab.
+
+        Yields:
+            Lines of HTML without trailing newlines.
+
+        Example:
+            >>> tag = html.div(html.p("Hello"), html.p("World"))
+            >>> for line in tag.iter_lines():
+            ...     print(line)
+            <div>
+                <p>
+                    Hello
+                </p>
+                <p>
+                    World
+                </p>
+            </div>
+        """
+        accu = ""
+        for chunk in self._to_string("", indent_char):
+            if "\n" in chunk:
+                parts = chunk.split("\n")
+                # Yield all complete lines (everything before the last part)
+                for part in parts[:-1]:
+                    yield accu + part
+                    accu = ""
+                # Keep the remainder for the next line
+                accu = parts[-1]
+            else:
+                accu += chunk
+
+        # Yield any remaining content
+        if accu:
+            yield accu
+
     def to_string(self, pretty: bool = False) -> str:
         return "".join(self.iter_string(pretty=pretty))
 

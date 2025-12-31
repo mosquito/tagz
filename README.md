@@ -160,21 +160,100 @@ assert str(html.my_custom_tag("hello")) == "<my-custom-tag>hello</my-custom-tag>
 
 You can pretty print the html output with `to_string(pretty=True)` or `to_html5(pretty=True)` methods:
 
+<!-- name: test_pretty_printing -->
 ```python
 from tagz import html
 
-print(
-    html.div(
-        "Hello", html.strong("world"),
-    ).to_string(pretty=True)
-)
-#<div>
-#	Hello
-#	<strong>
-#		world
-#	</strong>
-#</div>
+result = html.div(
+    "Hello", html.strong("world"),
+).to_string(pretty=True)
+
+assert result == "<div>\n\tHello\n\t<strong>\n\t\tworld\n\t</strong>\n</div>\n"
 ```
+
+## Iterating string generation
+
+For memory-efficient or streaming scenarios, `tagz` provides two methods for incremental HTML generation:
+
+### `iter_lines()` - Line-by-line iteration (recommended)
+
+The `iter_lines()` method yields complete lines of pretty-printed HTML, making it ideal for streaming to files or network sockets:
+
+<!-- name: test_iter_lines_basic -->
+```python
+from tagz import html
+
+tag = html.div(
+    html.p("First paragraph"),
+    html.p("Second paragraph"),
+)
+
+# Iterate line by line (always pretty-printed)
+lines = list(tag.iter_lines())
+assert lines == [
+    "<div>",
+    "\t<p>",
+    "\t\tFirst paragraph",
+    "\t</p>",
+    "\t<p>",
+    "\t\tSecond paragraph",
+    "\t</p>",
+    "</div>",
+]
+```
+
+You can customize the indentation character:
+
+<!-- name: test_iter_lines_indent -->
+```python
+from tagz import html
+
+tag = html.div(html.p("Hello"))
+
+# Customize indentation (default is tab)
+lines = list(tag.iter_lines(indent_char="  "))
+assert lines == [
+    "<div>",
+    "  <p>",
+    "    Hello",
+    "  </p>",
+    "</div>",
+]
+```
+
+Stream to a file:
+
+```python
+from tagz import html
+
+tag = html.div(html.p("Content"))
+
+# Stream to a file
+with open("output.html", "w") as f:
+    for line in tag.iter_lines():
+        f.write(line + "\n")
+```
+
+### `iter_string()` - Chunk-by-chunk iteration
+
+The `iter_string()` method yields small chunks of HTML, useful for very fine-grained control:
+
+<!-- name: test_iter_string -->
+```python
+from tagz import html
+
+tag = html.div(html.p("Hello"))
+
+# Generate HTML in small chunks (non-pretty)
+result = "".join(tag.iter_string())
+assert result == "<div><p>Hello</p></div>"
+
+# Also works with pretty printing
+pretty_result = "".join(tag.iter_string(pretty=True))
+assert pretty_result == "<div>\n\t<p>\n\t\tHello\n\t</p>\n</div>\n"
+```
+
+Both methods are useful when generating large HTML documents where you want to stream the output without building the entire string in memory.
 
 ## `Style` and `StyleSheet` helper objects
 
@@ -239,6 +318,28 @@ assert str(style) == "<style>body {margin: 0; padding: 0;}</style>"
 script = html.script('''console.log(1 > 2 && 3 < 2 && "0" === '0');''')
 assert str(script) == '''<script>console.log(1 > 2 && 3 < 2 && "0" === '0');</script>'''
 ```
+
+## Raw HTML Content
+
+Use the `Raw` class to embed completely unescaped HTML content. This is useful when you have pre-rendered HTML fragments or need to bypass all escaping:
+
+<!-- name: test_raw_html -->
+```python
+from tagz import html, Raw
+
+# Create raw HTML content (not escaped, no wrapper tags)
+raw = Raw("<div>raw content & more</div>")
+assert str(raw) == "<div>raw content & more</div>"
+
+# Can be used as a child of other tags
+container = html.div(raw)
+assert str(container) == "<div><div>raw content & more</div></div>"
+
+# Raw content is never indented in pretty mode
+assert raw.to_string(pretty=True) == "<div>raw content & more</div>"
+```
+
+**Warning:** `Raw` is completely unescaped and unsafe against XSS attacks. Only use it with trusted content or when you have already sanitized the HTML.
 
 ## Tag classes API
 

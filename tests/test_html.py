@@ -402,3 +402,94 @@ def test_raw():
     assert str(container) == "<div><div>raw content & more</div></div>"
 
     assert raw.to_string(pretty=True) == "<div>raw content & more</div>"
+
+
+def test_iter_lines():
+    # Test basic iteration
+    tag = html.div(
+        html.p("Hello"),
+        html.p("World"),
+    )
+
+    lines = list(tag.iter_lines())
+    expected_lines = [
+        "<div>",
+        "\t<p>",
+        "\t\tHello",
+        "\t</p>",
+        "\t<p>",
+        "\t\tWorld",
+        "\t</p>",
+        "</div>",
+    ]
+    assert lines == expected_lines
+
+    # Test with custom indent character
+    lines_spaces = list(tag.iter_lines(indent_char="  "))
+    expected_spaces = [
+        "<div>",
+        "  <p>",
+        "    Hello",
+        "  </p>",
+        "  <p>",
+        "    World",
+        "  </p>",
+        "</div>",
+    ]
+    assert lines_spaces == expected_spaces
+
+    # Test that joining lines with newlines gives same result as to_string(pretty=True)
+    assert "\n".join(tag.iter_lines()) + "\n" == tag.to_string(pretty=True)
+
+    # Test with nested tags
+    nested = html.div(
+        html.section(
+            html.p("Nested content"),
+        ),
+    )
+    nested_lines = list(nested.iter_lines())
+    assert nested_lines == [
+        "<div>",
+        "\t<section>",
+        "\t\t<p>",
+        "\t\t\tNested content",
+        "\t\t</p>",
+        "\t</section>",
+        "</div>",
+    ]
+
+    # Test with void elements
+    void_tag = html.div(html.br(), "text", html.hr())
+    void_lines = list(void_tag.iter_lines())
+    assert void_lines == [
+        "<div>",
+        "\t<br/>",
+        "\ttext",
+        "\t<hr/>",
+        "</div>",
+    ]
+
+    # Test with multi-line string content (like StyleSheet)
+    style_content = "body {margin: 0;}\n.container {padding: 10px;}"
+    style_tag = html.style(style_content)
+    style_lines = list(style_tag.iter_lines())
+    assert style_lines == [
+        "<style>",
+        "\tbody {margin: 0;}",
+        "\t.container {padding: 10px;}",
+        "</style>",
+    ]
+
+    # Test empty tag
+    empty = html.div()
+    empty_lines = list(empty.iter_lines())
+    assert empty_lines == ["<div>", "</div>"]
+
+    # Test single text content
+    simple = html.p("Simple text")
+    simple_lines = list(simple.iter_lines())
+    assert simple_lines == [
+        "<p>",
+        "\tSimple text",
+        "</p>",
+    ]
