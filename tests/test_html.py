@@ -155,6 +155,14 @@ def test_tag_attributes(subtests):
         tag = html.input(type="checkbox", checked=None)
         assert str(tag) == '<input checked type="checkbox"/>'
 
+    with subtests.test("Setting attribute to False removes it"):
+        tag = html.input(type="checkbox", checked=False)
+        assert str(tag) == '<input type="checkbox"/>'
+
+    with subtests.test("Setting attribute to True renders as boolean attribute"):
+        tag = html.input(type="checkbox", disabled=True)
+        assert str(tag) == '<input disabled type="checkbox"/>'
+
     with subtests.test("Attribute value escaping"):
         tag = html.div(title='This is a "quote" & test')
         expected = '<div title="This is a &quot;quote&quot; &amp; test"></div>'
@@ -173,6 +181,22 @@ def test_tag_attributes(subtests):
         tag["test"] = ABSENT
         assert "test" not in tag.attributes
         assert str(tag) == "<div></div>"
+
+
+def test_unescaped_attribute(subtests):
+    with subtests.test("Integer attribute value"):
+        tag = html.div(foo=123)
+        assert str(tag) == '<div foo="123"></div>'
+    with subtests.test("None attribute value"):
+        tag = html.div(foo=None)
+        assert str(tag) == "<div foo></div>"
+    with subtests.test("True attribute value"):
+        tag = html.div(foo=True)
+        assert str(tag) == "<div foo></div>"
+    with subtests.test("Unsafe attribute value"):
+        tag = html.div(foo="<b>unsafe</b>")
+        # All attribute values must be escaped
+        assert str(tag) == '<div foo="&lt;b&gt;unsafe&lt;/b&gt;"></div>'
 
 
 def test_tag_features():

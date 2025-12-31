@@ -91,18 +91,6 @@ def test_attr_tag_not_supported():
     assert "&lt;" in result and "&gt;" in result
 
 
-def test_unescaped_attribute():
-    tag = html.div(foo=123)
-    assert str(tag) == '<div foo="123"></div>'
-    tag = html.div(foo=None)
-    assert str(tag) == "<div foo></div>"
-    tag = html.div(foo=True)
-    assert str(tag) == '<div foo="True"></div>'
-    tag = html.div(foo="<b>unsafe</b>")
-    # All attribute values must be escaped
-    assert str(tag) == '<div foo="&lt;b&gt;unsafe&lt;/b&gt;"></div>'
-
-
 def test_attribute_absent():
     present = True
 
@@ -118,3 +106,11 @@ def test_attribute_absent():
 
     present = True
     assert str(tag) == '<div test="value"></div>'
+
+
+def test_callable_children_escape():
+    def child():
+        return "<script>alert('xss');</script>"
+
+    tag = html.div(child)
+    assert str(tag) == "<div>&lt;script&gt;alert(&#x27;xss&#x27;);&lt;/script&gt;</div>"

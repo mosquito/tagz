@@ -70,6 +70,7 @@ class Tag:
         self,
         _tag_name: str,
         *_children: ChildType,
+        # class is a keyword in Python, so we use 'classes' instead here, but map it to 'class' attribute
         classes: Union[Iterable[str], AbstractSet[str], str] = (),
         _void: bool = False,
         _escaped: bool = True,
@@ -98,10 +99,10 @@ class Tag:
     def classes(self, value: Union[Iterable[str], AbstractSet[str], str]) -> None:
         # Accepts list, set, tuple, or str
         if isinstance(value, (list, set, tuple)):
-            self._classes = set(value)
+            self._classes = set(escape(v, quote=True) for v in value)
             return
         elif isinstance(value, str):
-            self._classes = set(value.split())
+            self._classes = set(escape(v, quote=True) for v in value.split())
             return
 
         raise TypeError(
@@ -119,14 +120,19 @@ class Tag:
     def __setitem__(self, key: str, value: AttributeType) -> None:
         k = escape(key)
 
+        if k in ("class", "classes"):
+            # Map 'class' and 'classes' attributes to the classes property
+            self.classes = value  # type: ignore
+            return
+
         if value is ABSENT:
             self.attributes.pop(k, None)
             return
 
-        if k == "classes":
-            self.classes = value  # type: ignore
-        else:
-            self.attributes[k] = value
+        if isinstance(value, bool):
+            value = None if value else ABSENT
+
+        self.attributes[k] = value
 
     def __getitem__(self, item: str) -> AttributeType:
         return self.attributes[escape(item)]
@@ -152,7 +158,7 @@ class Tag:
     def _format_classes(self) -> str:
         if not self.classes:
             return ""
-        return f'class="{" ".join(map(escape, sorted(self.classes)))}"'
+        return f'class="{" ".join(sorted(self.classes))}"'
 
     def __make_parts(self) -> Iterator[str]:
         yield self.name
@@ -182,11 +188,14 @@ class Tag:
 
         parts.append(">")
         for child in self.children:
-            value = child() if callable(child) else child
-            if isinstance(value, Tag):
-                parts.extend(value._to_string())
+            if callable(child):
+                child = child()
+                if isinstance(child, str) and self._escaped:
+                    child = escape(child)
+            if isinstance(child, Tag):
+                parts.extend(child._to_string())
             else:
-                parts.append(str(value))
+                parts.append(str(child))
         parts.append(f"</{self.name}>")
         return parts
 
