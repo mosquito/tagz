@@ -173,7 +173,7 @@ assert result == "<div>\n\tHello\n\t<strong>\n\t\tworld\n\t</strong>\n</div>\n"
 
 ## Iterating string generation
 
-For memory-efficient or streaming scenarios, `tagz` provides two methods for incremental HTML generation:
+For memory-efficient or streaming scenarios, `tagz` provides three methods for incremental HTML generation:
 
 ### `iter_lines()` - Line-by-line iteration (recommended)
 
@@ -223,20 +223,64 @@ assert lines == [
 
 Stream to a file:
 
+<!-- name: test_iter_lines_file -->
 ```python
 from tagz import html
+from tempfile import NamedTemporaryFile
 
 tag = html.div(html.p("Content"))
 
 # Stream to a file
-with open("output.html", "w") as f:
+with NamedTemporaryFile(mode="w", suffix=".html", delete=True) as f:
     for line in tag.iter_lines():
         f.write(line + "\n")
+    f.flush()
 ```
 
-### `iter_string()` - Chunk-by-chunk iteration
+### `iter_chunk()` - Fixed-size chunk iteration
 
-The `iter_string()` method yields small chunks of HTML, useful for very fine-grained control:
+The `iter_chunk()` method yields HTML in fixed-size chunks, perfect for network transmission or buffered I/O:
+
+<!-- name: test_iter_chunk_basic -->
+```python
+from tagz import html
+
+tag = html.div(
+    html.p("First paragraph with some content"),
+    html.p("Second paragraph with more content"),
+)
+
+# Generate HTML in 50-byte chunks
+chunks = list(tag.iter_chunk(chunk_size=50))
+
+# Each chunk is approximately 50 bytes (except possibly the last one)
+assert all(len(chunk) <= 50 or chunk == chunks[-1] for chunk in chunks)
+
+# Verify reconstruction
+assert "".join(chunks) == tag.to_string()
+```
+
+You can use it with pretty printing and custom indentation:
+
+<!-- name: test_iter_chunk_pretty -->
+```python
+from tagz import html
+from functools import partial
+
+content = "Paragraph {}"
+# Create a large tag with many lazy evaluated children
+tag = html.div([partial(content.format, i) for i in range(10000)])
+
+# Pretty-printed chunks with custom indent
+chunks = list(tag.iter_chunk(chunk_size=1024, pretty=True, indent_char="  "))
+
+# Number of chunks in this case should be 781
+assert len(chunks) == 781, len(chunks)
+```
+
+### `iter_string()` - Fragment-by-fragment iteration
+
+The `iter_string()` method yields tiny fragments of HTML as they are generated, useful for very fine-grained control:
 
 <!-- name: test_iter_string -->
 ```python
@@ -244,7 +288,7 @@ from tagz import html
 
 tag = html.div(html.p("Hello"))
 
-# Generate HTML in small chunks (non-pretty)
+# Generate HTML in small fragments (non-pretty)
 result = "".join(tag.iter_string())
 assert result == "<div><p>Hello</p></div>"
 
@@ -253,7 +297,7 @@ pretty_result = "".join(tag.iter_string(pretty=True))
 assert pretty_result == "<div>\n\t<p>\n\t\tHello\n\t</p>\n</div>\n"
 ```
 
-Both methods are useful when generating large HTML documents where you want to stream the output without building the entire string in memory.
+All these methods are useful when generating large HTML documents where you want to stream the output without building the entire string in memory.
 
 ## `Style` and `StyleSheet` helper objects
 
