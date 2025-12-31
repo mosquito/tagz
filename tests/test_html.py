@@ -493,3 +493,72 @@ def test_iter_lines():
         "\tSimple text",
         "</p>",
     ]
+
+
+def test_iter_chunk():
+    # Test basic chunking
+    tag = html.div(
+        html.p("Hello World"),
+        html.p("Second paragraph"),
+    )
+
+    # Small chunk size to force multiple chunks
+    chunks = list(tag.iter_chunk(chunk_size=10))
+    # Verify we got multiple chunks
+    assert len(chunks) > 1
+    # Verify joining chunks gives the same result as to_string
+    assert "".join(chunks) == tag.to_string()
+
+    # Test with pretty mode
+    pretty_chunks = list(tag.iter_chunk(chunk_size=20, pretty=True))
+    assert len(pretty_chunks) > 1
+    assert "".join(pretty_chunks) == tag.to_string(pretty=True)
+
+    # Test with custom indent character
+    indent_chunks = list(tag.iter_chunk(chunk_size=15, pretty=True, indent_char="  "))
+    assert "".join(indent_chunks) == tag.to_string(pretty=True).replace("\t", "  ")
+
+    # Test exact chunk size behavior
+    simple = html.div("A" * 100)  # Create content longer than chunk_size
+    chunks_50 = list(simple.iter_chunk(chunk_size=50))
+    # Each chunk (except possibly the last) should be exactly 50 chars
+    for chunk in chunks_50[:-1]:
+        assert len(chunk) == 50
+    # Verify reconstruction
+    assert "".join(chunks_50) == simple.to_string()
+
+    # Test with very large chunk size (should get single chunk)
+    large_chunks = list(tag.iter_chunk(chunk_size=10000))
+    assert len(large_chunks) == 1
+    assert large_chunks[0] == tag.to_string()
+
+    # Test empty tag
+    empty = html.div()
+    empty_chunks = list(empty.iter_chunk(chunk_size=10))
+    assert "".join(empty_chunks) == "<div></div>"
+
+    # Test nested complex structure
+    nested = html.div(
+        html.section(
+            html.article(
+                html.p("Content " * 20),
+                html.p("More content " * 20),
+            )
+        )
+    )
+    nested_chunks = list(nested.iter_chunk(chunk_size=100))
+    assert len(nested_chunks) > 1
+    assert "".join(nested_chunks) == nested.to_string()
+
+    # Test with void elements
+    void_tag = html.div(html.br(), html.hr(), html.img(src="test.png"))
+    void_chunks = list(void_tag.iter_chunk(chunk_size=15))
+    assert "".join(void_chunks) == void_tag.to_string()
+
+    # Test chunk size of 1 (edge case)
+    tiny = html.p("Hi")
+    tiny_chunks = list(tiny.iter_chunk(chunk_size=1))
+    # Should have multiple single-character chunks
+    assert len(tiny_chunks) > 1
+    assert all(len(chunk) <= 1 for chunk in tiny_chunks)
+    assert "".join(tiny_chunks) == tiny.to_string()

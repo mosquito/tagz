@@ -288,6 +288,45 @@ class Tag:
         if accu:
             yield accu
 
+    def iter_chunk(
+        self, chunk_size: int = 4096, pretty: bool = False, indent_char: str = "\t"
+    ) -> Iterator[str]:
+        """
+        Iterate over the HTML output in fixed-size chunks.
+
+        This method accumulates HTML output and yields chunks of approximately
+        the specified size. Useful for streaming large HTML documents over
+        network connections or writing to buffered outputs with specific
+        buffer sizes.
+
+        Args:
+            chunk_size: Target size for each chunk in bytes. Defaults to 4096.
+                       The actual chunk size may be slightly larger to avoid
+                       breaking in the middle of a fragment.
+            pretty: If True, format with indentation and newlines.
+            indent_char: The character(s) to use for indentation when pretty=True.
+                        Defaults to tab character.
+
+        Yields:
+            Chunks of HTML as strings, each approximately chunk_size bytes.
+
+        Example:
+            >>> tag = html.div(html.p("Hello") * 1000)
+            >>> for chunk in tag.iter_chunk(chunk_size=1024):
+            ...     socket.send(chunk.encode())
+        """
+        buffer = ""
+        for fragment in self._to_string("", indent_char if pretty else ""):
+            buffer += fragment
+            # Yield chunks when buffer exceeds chunk_size
+            while len(buffer) >= chunk_size:
+                yield buffer[:chunk_size]
+                buffer = buffer[chunk_size:]
+
+        # Yield any remaining content
+        if buffer:
+            yield buffer
+
     def to_string(self, pretty: bool = False) -> str:
         return "".join(self.iter_string(pretty=pretty))
 
