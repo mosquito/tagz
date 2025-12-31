@@ -205,6 +205,140 @@ print(
 )
 ```
 
+## Controlling Attribute Absence
+
+You can use the special value `ABSENT` to dynamically remove an attribute from a tag. This is useful for callables that may want to omit an attribute based on logic.
+
+<!-- name: test_absent_attr -->
+```python
+from tagz import html, ABSENT
+
+present = True
+
+def attr():
+     return "value" if present else ABSENT
+
+tag = html.div(test=attr)
+assert str(tag) == '<div test="value"></div>'
+
+present = False
+assert str(tag) == "<div></div>"
+```
+
+## Raw Content in Script and Style
+
+Content inside `<script>` and `<style>` tags is not escaped by default. This allows you to embed raw JS/CSS.
+
+<!-- name: test_raw_script_style -->
+```python
+from tagz import html
+
+style = html.style("body {margin: 0; padding: 0;}")
+assert str(style) == "<style>body {margin: 0; padding: 0;}</style>"
+
+script = html.script('''console.log(1 > 2 && 3 < 2 && "0" === '0');''')
+assert str(script) == '''<script>console.log(1 > 2 && 3 < 2 && "0" === '0');</script>'''
+```
+
+## Tag classes API
+
+The `classes` property supports assignment via set, list, tuple, or space-separated string, and raises a `TypeError` for invalid types.
+
+<!-- name: test_classes_setter -->
+```python
+from tagz import html
+
+tag = html.div()
+tag.classes = "foo bar"
+assert tag.classes == {"foo", "bar"}
+tag.classes = ["baz"]
+assert tag.classes == {"baz"}
+```
+
+You can use either `class` or `classes` as a keyword argument or attribute key. Both will be mapped to the HTML `class` attribute and the internal `classes` set. This allows for more natural Python code:
+
+<!-- name: test_class_attribute -->
+```python
+from tagz import html
+
+tag = html.div(classes=["foo", "bar"])
+# Classes are stored as a set internally
+assert str(tag) == '<div class="bar foo"></div>', str(tag)
+
+tag["class"] = "baz"
+assert str(tag) == '<div class="baz"></div>', str(tag)
+
+tag["classes"] = "spam eggs"
+# Classes was splitted and are stored as a set internally
+assert str(tag) == '<div class="eggs spam"></div>', str(tag)
+```
+
+## Escaping Callable Children
+
+If a callable child returns a string, it will be escaped by default (unless the tag disables escaping, e.g., `<script>` or `<style>`):
+
+<!-- name: test_escaped_callable_child -->
+```python
+from tagz import html
+
+def child():
+    return "<script>alert('xss');</script>"
+
+tag = html.div(child)
+assert str(tag) == "<div>&lt;script&gt;alert(&#x27;xss&#x27;);&lt;/script&gt;</div>"
+```
+
+## Boolean Attribute Handling
+
+Setting an attribute to `True` renders it as a boolean attribute (e.g., `<input checked>`). Setting it to `False` removes the attribute:
+
+<!-- name: test_boolean_attribute -->
+```python
+from tagz import html
+
+tag = html.input(type="checkbox", checked=True)
+assert str(tag) == '<input checked type="checkbox"/>'
+tag["checked"] = False
+assert str(tag) == '<input type="checkbox"/>'
+```
+
+## Data URI helpers
+
+You can embed binary data directly in HTML attributes using `data_uri` and `open_data_uri`:
+
+<!-- name: test_data_uri -->
+```python
+from tagz import data_uri
+
+src = data_uri(b"hello world", media_type="text/plain")
+assert src == "data:text/plain;base64,aGVsbG8gd29ybGQ="
+```
+
+Or use `open_data_uri` to read and encode a file directly:
+
+<!-- name: test_open_data_uri -->
+```python
+from tempfile import NamedTemporaryFile
+from tagz import open_data_uri, html
+
+with NamedTemporaryFile("wb", suffix=".png") as f:
+    # Write a minimal PNG file
+    f.write(b"\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00\x01"
+            b"\x00\x00\x00\x01\x08\x06\x00\x00\x00\x1f\x15\xc4"
+            b"\x89\x00\x00\x00\nIDATx\xdac\xf8\x0f\x00\x01\x01"
+            b"\x01\x00\x18\xdd\x03\xe2\x00\x00\x00\x00IEND\xaeB`\x82")
+    f.flush()
+    f.seek(0)
+
+    src = open_data_uri(f.name, media_type="image/png")
+    img_tag = html.img(src=src, alt="Nothing")
+    assert str(img_tag).startswith(
+        '<img alt="Nothing" src="data:image/png;base64,'
+        'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcS'
+        'JAAAACklEQVR42mP4DwABAQEAGN0D4gAAAABJRU5ErkJggg=='
+    )
+```
+
 # More examples
 
 ## Building page from parts
@@ -301,41 +435,4 @@ page = Page(
 
 with open("/tmp/csv.html", "w") as fp:
     fp.write(page.to_html5())
-```
-
-## Data URI helpers
-
-You can embed binary data directly in HTML attributes using `data_uri` and `open_data_uri`:
-
-<!-- name: test_data_uri -->
-```python
-from tagz import data_uri
-
-src = data_uri(b"hello world", media_type="text/plain")
-assert src == "data:text/plain;base64,aGVsbG8gd29ybGQ="
-```
-
-Or use `open_data_uri` to read and encode a file directly:
-
-<!-- name: test_open_data_uri -->
-```python
-from tempfile import NamedTemporaryFile
-from tagz import open_data_uri, html
-
-with NamedTemporaryFile("wb", suffix=".png") as f:
-    # Write a minimal PNG file
-    f.write(b"\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00\x01"
-            b"\x00\x00\x00\x01\x08\x06\x00\x00\x00\x1f\x15\xc4"
-            b"\x89\x00\x00\x00\nIDATx\xdac\xf8\x0f\x00\x01\x01"
-            b"\x01\x00\x18\xdd\x03\xe2\x00\x00\x00\x00IEND\xaeB`\x82")
-    f.flush()
-    f.seek(0)
-
-    src = open_data_uri(f.name, media_type="image/png")
-    img_tag = html.img(src=src, alt="Nothing")
-    assert str(img_tag).startswith(
-        '<img alt="Nothing" src="data:image/png;base64,'
-        'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcS'
-        'JAAAACklEQVR42mP4DwABAQEAGN0D4gAAAABJRU5ErkJggg=='
-    )
 ```

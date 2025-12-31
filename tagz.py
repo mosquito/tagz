@@ -10,6 +10,7 @@ from textwrap import indent
 from types import MappingProxyType
 from typing import (
     Any,
+    AbstractSet,
     Dict,
     Iterable,
     Iterator,
@@ -44,61 +45,109 @@ class StyleSheet(Dict[Union[str, Tuple[str, ...]], Style]):
         return "\n".join(styles)
 
 
-@dataclass(frozen=False)
+class AbsentAttribute:
+    pass
+
+
+ABSENT = AbsentAttribute()
+
+ChildType = Union["Tag", str, Callable[[], Union["Tag", str]]]
+AttributeType = Union[
+    str, None, Style, Callable[[], Union[str, None, Style, AbsentAttribute]]
+]
+
+
+@dataclass(frozen=False, slots=True)
 class Tag:
     name: str
-    classes: MutableSet[str]
-    children: List[Union["Tag", str, Callable[[], Union["Tag", str]]]]
-    attributes: MutableMapping[
-        str, Union[str, None, Style, Callable[[], Union[str, None, Style]]]
-    ]
+    children: List[ChildType]
+    attributes: MutableMapping[str, AttributeType]
+    _classes: MutableSet[str]
     _void: bool
+    _escaped: bool
 
     def __init__(
         self,
         _tag_name: str,
-        *_children: Union[str, "Tag", Callable[[], Union["Tag", str]]],
-        classes: Iterable[str] = (),
+        *_children: ChildType,
+        # class is a keyword in Python, so we use 'classes' instead here, but map it to 'class' attribute
+        classes: Union[Iterable[str], AbstractSet[str], str] = (),
         _void: bool = False,
-        **attributes: Union[str, None, Style, Callable[[], Union[str, None, Style]]],
+        _escaped: bool = True,
+        **attributes: AttributeType,
     ):
-        attrs: MutableMapping[
-            str, Union[str, None, Style, Callable[[], Union[str, None, Style]]]
-        ] = {}
-        for key, value in sorted(attributes.items(), key=lambda item: item[0]):
-            attrs[key.replace("_", "-")] = value
-
         self.name = escape(_tag_name)
-        self.classes = set(classes)
-        self.attributes = attrs
+        self._classes = set()
+        self.attributes = {}
         self._void = _void
-        if _void and _children:
-            raise ValueError("Void elements cannot have children.")
+        self._escaped = _escaped
 
-        self.children = list(_children)
+        self.children = list()
+        for child in _children:
+            self.append(child)
 
-    def append(self, other: Union["Tag", str, Callable[[], Union["Tag", str]]]) -> None:
+        for key, value in sorted(attributes.items(), key=lambda item: item[0]):
+            self[key.replace("_", "-")] = value
+
+        self.classes = classes  # type: ignore
+
+    @property
+    def classes(self) -> AbstractSet[str]:
+        return self._classes
+
+    @classes.setter
+    def classes(self, value: Union[Iterable[str], AbstractSet[str], str]) -> None:
+        # Accepts list, set, tuple, or str
+        if isinstance(value, (list, set, tuple)):
+            self._classes = set(escape(v, quote=True) for v in value)
+            return
+        elif isinstance(value, str):
+            self._classes = set(escape(v, quote=True) for v in value.split())
+            return
+
+        raise TypeError(
+            "Classes must be an iterable of strings or a space-separated string."
+        )
+
+    def append(self, other: ChildType) -> None:
         if self._void:
             raise ValueError("Cannot append children to a void element.")
+
+        if isinstance(other, str) and self._escaped:
+            other = escape(other)
         return self.children.append(other)
 
-    def __setitem__(
-        self,
-        key: str,
-        value: Union[str, None, Style, Callable[[], Union[str, None, Style]]],
-    ) -> None:
-        self.attributes[escape(key)] = value
+    def __setitem__(self, key: str, value: AttributeType) -> None:
+        k = escape(key)
 
-    def __getitem__(
-        self, item: str
-    ) -> Union[str, None, Style, Callable[[], Union[str, None, Style]]]:
+        if k in ("class", "classes"):
+            # Map 'class' and 'classes' attributes to the classes property
+            self.classes = value  # type: ignore
+            return
+
+        if value is ABSENT:
+            self.attributes.pop(k, None)
+            return
+
+        if isinstance(value, bool):
+            value = None if value else ABSENT
+
+        self.attributes[k] = value
+
+    def __getitem__(self, item: str) -> AttributeType:
         return self.attributes[escape(item)]
+
+    def __delitem__(self, key: str) -> None:
+        del self.attributes[escape(key)]
 
     def _format_attributes(self) -> str:
         parts = []
-        for key, value in self.attributes.items():
+        # Sort attributes for deterministic output
+        for key, value in sorted(self.attributes.items()):
             key = escape(key)
             v = value() if callable(value) else value
+            if v is ABSENT:
+                continue
             if v is None:
                 parts.append(key)
                 continue
@@ -109,7 +158,7 @@ class Tag:
     def _format_classes(self) -> str:
         if not self.classes:
             return ""
-        return f'class="{" ".join(map(escape, sorted(self.classes)))}"'
+        return f'class="{" ".join(sorted(self.classes))}"'
 
     def __make_parts(self) -> Iterator[str]:
         yield self.name
@@ -139,11 +188,14 @@ class Tag:
 
         parts.append(">")
         for child in self.children:
-            value = child() if callable(child) else child
-            if isinstance(value, Tag):
-                parts.extend(value._to_string())
+            if callable(child):
+                child = child()
+                if isinstance(child, str) and self._escaped:
+                    child = escape(child)
+            if isinstance(child, Tag):
+                parts.extend(child._to_string())
             else:
-                parts.append(str(value).strip())
+                parts.append(str(child))
         parts.append(f"</{self.name}>")
         return parts
 
@@ -152,14 +204,14 @@ class Tag:
         if self._void:
             parts.append(f"/>\n")
             return [indent("".join(parts), _indent)]
-        
+
         parts.append(">\n")
         for child in self.children:
             value = child() if callable(child) else child
             if isinstance(value, Tag):
                 parts.extend(value._to_pretty_string("\t"))
             else:
-                child_str = str(value).strip()
+                child_str = str(value)
                 if not child_str:
                     continue
                 parts.append(indent(child_str, _indent if _indent else "\t"))
@@ -174,24 +226,30 @@ class Tag:
 class TagInstance(Tag):
     __tag_name__: str
     __void__: bool = False
+    __escaped__: bool = True
     __default_children__: Iterable[Union[str, Tag]] = ()
     __default_attributes__: Optional[Mapping[str, str]] = None
 
     def __init__(
         self,
-        *_children: Union[str, "Tag", Callable[[], Union["Tag", str]]],
+        *_children: ChildType,
         classes: Iterable[str] = (),
-        **attributes: Union[str, None, Style, Callable[[], Union[str, None, Style]]],
+        **attributes: AttributeType,
     ):
-        attrs: Dict[
-            str, Union[str, None, Style, Callable[[], Union[str, None, Style]]]
-        ] = dict(self.__default_attributes__ or {})
+        attrs: Dict[str, AttributeType] = dict(self.__default_attributes__ or {})
         attrs.update(**attributes)
         _children = tuple(
             copy(item) for item in chain(self.__default_children__, _children)
         )
 
-        super().__init__(self.__tag_name__, *_children, _void=self.__void__, classes=classes, **attrs)
+        super().__init__(
+            self.__tag_name__,
+            *_children,
+            _void=self.__void__,
+            _escaped=self.__escaped__,
+            classes=classes,
+            **attrs,
+        )
 
     def __copy__(self) -> "TagInstance":
         children = tuple(copy(item) for item in self.children)
@@ -221,7 +279,9 @@ class HTML:
     def __getattr__(self, tag_name: str) -> Type[TagInstance]:
         return self[tag_name.replace("_", "-")]
 
+
 _void = MappingProxyType({"__void__": True})
+_unescaped = MappingProxyType({"__escaped__": False})
 
 html = HTML(
     {
@@ -240,6 +300,9 @@ html = HTML(
         "source": _void,
         "track": _void,
         "wbr": _void,
+        # Unescaped content
+        "script": _unescaped,
+        "style": _unescaped,
     }
 )
 
@@ -306,4 +369,5 @@ __all__ = (
     "html",
     "data_uri",
     "open_data_uri",
+    "ABSENT",
 )

@@ -1,6 +1,6 @@
 [project]
 name = "tagz"
-version = "0.5.1"
+version = "0.6.0"
 description = "tagz is a html tags builder"
 authors = [{ name = "Dmitry Orlov", email = "orlovdl@gmail.com" }]
 requires-python = ">=3.10,<4"
