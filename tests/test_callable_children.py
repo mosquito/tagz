@@ -1,6 +1,6 @@
 import pytest
 from html import escape
-from tagz import html
+from tagz import html, ABSENT
 
 
 def test_callable_child_str():
@@ -101,3 +101,20 @@ def test_unescaped_attribute():
     tag = html.div(foo="<b>unsafe</b>")
     # All attribute values must be escaped
     assert str(tag) == '<div foo="&lt;b&gt;unsafe&lt;/b&gt;"></div>'
+
+
+def test_attribute_absent():
+    present = True
+
+    def attr():
+        nonlocal present
+        return "value" if present else ABSENT
+
+    tag = html.div(test=attr)
+    assert str(tag) == '<div test="value"></div>'
+
+    present = False
+    assert str(tag) == "<div></div>"
+
+    present = True
+    assert str(tag) == '<div test="value"></div>'
