@@ -4,6 +4,7 @@ from copy import copy
 from dataclasses import dataclass
 from functools import lru_cache
 from html import escape
+from html.parser import HTMLParser
 from pathlib import Path
 from itertools import chain
 from types import MappingProxyType
@@ -476,6 +477,171 @@ class Page:
         return "".join((self.PREAMBLE, self.html.to_string(pretty=pretty)))
 
 
+class TagParser(HTMLParser):
+    """HTML parser that builds Tag objects from HTML strings."""
+
+    def __init__(self) -> None:
+        super().__init__(convert_charrefs=True)
+        self.root_elements: List[Union[Tag, str]] = []
+        self.stack: List[Tag] = []
+        self.doctype: Optional[str] = None
+
+    def handle_starttag(self, tag: str, attrs: List[Tuple[str, Optional[str]]]) -> None:
+        """Handle opening tag."""
+        # Convert attrs list to dict, handling class specially
+        tag_attrs: Dict[str, Any] = {}
+        classes: List[str] = []
+
+        for key, value in attrs:
+            if key == "class":
+                classes.extend(value.split() if value else [])
+            else:
+                tag_attrs[key] = value if value is not None else None
+
+        # Create tag instance
+        tag_obj = html[tag](**tag_attrs)
+        if classes:
+            tag_obj.classes = set(classes)
+
+        # Add to parent or root
+        if self.stack:
+            self.stack[-1].append(tag_obj)
+        else:
+            self.root_elements.append(tag_obj)
+
+        # Push to stack (will be popped on endtag)
+        self.stack.append(tag_obj)
+
+    def handle_endtag(self, tag: str) -> None:
+        """Handle closing tag."""
+        if self.stack:
+            self.stack.pop()
+
+    def handle_startendtag(
+        self, tag: str, attrs: List[Tuple[str, Optional[str]]]
+    ) -> None:
+        """Handle self-closing/void tag."""
+        tag_attrs: Dict[str, Any] = {}
+        classes: List[str] = []
+
+        for key, value in attrs:
+            if key == "class":
+                classes.extend(value.split() if value else [])
+            else:
+                tag_attrs[key] = value if value is not None else None
+
+        tag_obj = html[tag](**tag_attrs)
+        if classes:
+            tag_obj.classes = set(classes)
+
+        if self.stack:
+            self.stack[-1].append(tag_obj)
+        else:
+            self.root_elements.append(tag_obj)
+
+    def handle_data(self, data: str) -> None:
+        """Handle text content."""
+        if self.stack:
+            self.stack[-1].append(data)
+        else:
+            # Text at root level
+            self.root_elements.append(data)
+
+    def handle_decl(self, decl: str) -> None:
+        """Handle DOCTYPE declaration."""
+        self.doctype = f"<!{decl}>"
+
+    def get_result(self) -> Union[Tag, Fragment, Page]:
+        """Get the parsed result."""
+        # Filter out whitespace-only text nodes at root level
+        filtered_roots = [
+            elem
+            for elem in self.root_elements
+            if not (isinstance(elem, str) and not elem.strip())
+        ]
+
+        if len(filtered_roots) == 0:
+            return Fragment()
+        elif len(filtered_roots) == 1:
+            result = filtered_roots[0]
+            if isinstance(result, str):
+                # Single text node -> wrap in Fragment
+                return Fragment(result)
+
+            # Check if it's a full HTML document
+            if isinstance(result, Tag) and result.name == "html":
+                # Extract head and body
+                head_element = None
+                body_element = None
+
+                for child in result.children:
+                    if isinstance(child, Tag):
+                        if child.name == "head":
+                            head_element = child
+                        elif child.name == "body":
+                            body_element = child
+
+                # Extract head children that are Tag objects
+                head_tags: List[Tag] = []
+                if head_element:
+                    for child in head_element.children:
+                        if isinstance(child, Tag):
+                            head_tags.append(child)
+
+                # Filter attributes to only string values
+                html_attrs: Dict[str, str] = {}
+                for key, value in result.attributes.items():
+                    if isinstance(value, str):
+                        html_attrs[key] = value
+
+                # Create Page object
+                page = Page(
+                    body_element=body_element, head_elements=head_tags, **html_attrs
+                )
+
+                # Override preamble if we have a custom DOCTYPE
+                if self.doctype:
+                    page.PREAMBLE = self.doctype + "\n"
+
+                return page
+
+            return result
+        else:
+            # Multiple root elements
+            return Fragment(*filtered_roots)
+
+
+def parse(html_string: str) -> Union[Tag, Fragment, Page]:
+    """
+    Parse HTML string into Tag objects.
+
+    Args:
+        html_string: The HTML string to parse.
+
+    Returns:
+        A Tag object if there's a single root element,
+        a Fragment if there are multiple root elements or text nodes,
+        or a Page if the HTML contains a complete document with <html> tag.
+
+    Example:
+        >>> tag = parse('<div class="container"><p>Hello</p></div>')
+        >>> print(tag)
+        <div class="container"><p>Hello</p></div>
+
+        >>> fragment = parse('<p>First</p><p>Second</p>')
+        >>> print(fragment)
+        <p>First</p><p>Second</p>
+
+        >>> page = parse('<!DOCTYPE html><html><head></head><body>Content</body></html>')
+        >>> isinstance(page, Page)
+        True
+    """
+    parser = TagParser()
+    parser.feed(html_string)
+    parser.close()
+    return parser.get_result()
+
+
 def data_uri(data: bytes, media_type: str = "application/octet-stream") -> str:
     """
     Encode binary data as a data URI for use in HTML attributes.
@@ -518,9 +684,11 @@ __all__ = (
     "HTML",
     "open_data_uri",
     "Page",
+    "parse",
     "Raw",
     "Style",
     "StyleSheet",
     "Tag",
     "TagInstance",
+    "TagParser",
 )

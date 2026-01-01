@@ -2,7 +2,19 @@ from copy import copy
 
 import pytest
 
-from tagz import HTML, Page, Style, StyleSheet, Tag, html, ABSENT, Raw, Fragment
+from tagz import (
+    HTML,
+    Page,
+    Style,
+    StyleSheet,
+    Tag,
+    html,
+    ABSENT,
+    Raw,
+    Fragment,
+    parse,
+    TagParser,
+)
 
 
 @pytest.fixture
@@ -232,6 +244,15 @@ def test_style():
 
     style = Style()
     assert str(style) == ""
+
+    # Test Style with dict arg (covers args parameter)
+    style_dict = Style({"color": "red"})
+    assert "color: red;" in str(style_dict)
+
+    # Test with underscored kwargs
+    style_underscored = Style(font_size="12px", background_color="blue")
+    assert "font-size: 12px;" in str(style_underscored)
+    assert "background-color: blue;" in str(style_underscored)
 
     style["padding"] = 0
     assert str(style) == "padding: 0;"
@@ -676,3 +697,239 @@ def test_iter_chunk():
     assert len(tiny_chunks) > 1
     assert all(len(chunk) <= 1 for chunk in tiny_chunks)
     assert "".join(tiny_chunks) == tiny.to_string()
+
+
+def test_parse(subtests):
+    """Test HTML parsing functionality."""
+
+    with subtests.test("basic single element"):
+        result = parse("<div>Hello</div>")
+        assert isinstance(result, Tag)
+        assert result.name == "div"
+        assert str(result) == "<div>Hello</div>"
+
+    with subtests.test("nested elements"):
+        html_str = "<div><p>Paragraph</p><span>Text</span></div>"
+        result = parse(html_str)
+        assert isinstance(result, Tag)
+        assert result.name == "div"
+        assert len(result.children) == 2
+        assert str(result) == html_str
+
+    with subtests.test("multiple root elements"):
+        html_str = "<p>First</p><p>Second</p>"
+        result = parse(html_str)
+        assert isinstance(result, Fragment)
+        assert str(result) == html_str
+
+    with subtests.test("attributes"):
+        result = parse('<div id="main" data-value="test">Content</div>')
+        assert result["id"] == "main"
+        assert result["data-value"] == "test"
+        # Attributes are sorted, so check content
+        assert 'id="main"' in str(result)
+        assert 'data-value="test"' in str(result)
+        assert ">Content</div>" in str(result)
+
+    with subtests.test("class attribute"):
+        result = parse('<div class="container primary">Content</div>')
+        assert "container" in result.classes
+        assert "primary" in result.classes
+        # Classes are sorted when rendered
+        assert 'class="container primary"' in str(result)
+
+    with subtests.test("void elements"):
+        html_str = "<div><br/><hr/></div>"
+        result = parse(html_str)
+        assert len(result.children) == 2
+        # Parser normalizes to <br/>
+        assert str(result) == html_str
+
+    with subtests.test("self-closing tags"):
+        html_str = '<img src="test.jpg" alt="Test"/>'
+        result = parse(html_str)
+        assert isinstance(result, Tag)
+        assert result.name == "img"
+        assert result["src"] == "test.jpg"
+        assert result["alt"] == "Test"
+
+    with subtests.test("text content"):
+        result = parse("Just text")
+        assert isinstance(result, Fragment)
+        assert str(result) == "Just text"
+
+    with subtests.test("mixed content"):
+        html_str = "Text before<p>Paragraph</p>Text after"
+        result = parse(html_str)
+        assert isinstance(result, Fragment)
+        assert len(result.children) == 3
+        assert str(result) == html_str
+
+    with subtests.test("entity decoding"):
+        result = parse("<p>&lt;script&gt;alert('xss')&lt;/script&gt;</p>")
+        # Entities should be decoded, then re-escaped when rendering
+        output = str(result)
+        assert "&lt;script&gt;" in output
+        assert "alert(" in output
+        assert "xss" in output
+
+    with subtests.test("empty input"):
+        result = parse("")
+        assert isinstance(result, Fragment)
+        assert str(result) == ""
+
+    with subtests.test("whitespace only input"):
+        result = parse("   \n\t  \n  ")
+        assert isinstance(result, Fragment)
+        assert str(result) == ""
+
+    with subtests.test("complex nested structure"):
+        html_str = '<div class="container"><header><h1>Title</h1></header><main><p>Content</p></main></div>'
+        result = parse(html_str)
+        assert isinstance(result, Tag)
+        assert result.name == "div"
+        assert "container" in result.classes
+        # Should round-trip correctly
+        assert str(result) == html_str
+
+    with subtests.test("multiple classes"):
+        html_str = '<span class="badge primary large active">Text</span>'
+        result = parse(html_str)
+        assert len(result.classes) == 4
+        assert all(
+            cls in result.classes for cls in ["badge", "primary", "large", "active"]
+        )
+
+    with subtests.test("boolean attributes"):
+        html_str = '<input type="checkbox" checked/>'
+        result = parse(html_str)
+        assert result["type"] == "checkbox"
+        assert result["checked"] is None  # Boolean attribute
+
+    with subtests.test("whitespace preservation"):
+        html_str = "<p>Line one\nLine two</p>"
+        result = parse(html_str)
+        assert "\n" in str(result)
+
+    with subtests.test("script tag"):
+        html_str = "<script>console.log('test');</script>"
+        result = parse(html_str)
+        assert result.name == "script"
+        # Script content should be unescaped
+        assert "console.log('test');" in str(result)
+
+    with subtests.test("style tag"):
+        html_str = "<style>body { margin: 0; }</style>"
+        result = parse(html_str)
+        assert result.name == "style"
+        assert "margin: 0;" in str(result)
+
+    with subtests.test("deeply nested"):
+        html_str = "<div><div><div><p>Deep</p></div></div></div>"
+        result = parse(html_str)
+        assert str(result) == html_str
+
+    with subtests.test("attributes without values"):
+        html_str = "<button disabled>Click</button>"
+        result = parse(html_str)
+        assert result["disabled"] is None
+
+    with subtests.test("full html document returns Page"):
+        html_str = "<!DOCTYPE html><html><head><title>Test</title></head><body><p>Content</p></body></html>"
+        result = parse(html_str)
+        assert isinstance(result, Page)
+        assert result.body is not None
+        assert "Content" in str(result.body)
+        assert result.head is not None
+        assert "Test" in str(result.head)
+
+    with subtests.test("html5 doctype"):
+        html_str = "<!DOCTYPE html><html><head></head><body>Test</body></html>"
+        result = parse(html_str)
+        assert isinstance(result, Page)
+        full_html = result.to_html5()
+        assert full_html.startswith("<!DOCTYPE html>")
+
+    with subtests.test("html4 doctype"):
+        html_str = '<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01//EN" "http://www.w3.org/TR/html4/strict.dtd"><html><head></head><body>Test</body></html>'
+        result = parse(html_str)
+        assert isinstance(result, Page)
+        full_html = result.to_html5()
+        assert "HTML 4.01" in full_html
+        assert full_html.startswith("<!DOCTYPE HTML PUBLIC")
+
+    with subtests.test("html document with attributes"):
+        html_str = '<html lang="en"><head></head><body>Content</body></html>'
+        result = parse(html_str)
+        assert isinstance(result, Page)
+        assert result.html["lang"] == "en"
+
+    with subtests.test("minimal html document"):
+        html_str = "<html><body>Content</body></html>"
+        result = parse(html_str)
+        assert isinstance(result, Page)
+        assert result.body is not None
+        assert "Content" in str(result.body)
+
+    with subtests.test("html with only head"):
+        html_str = "<html><head><title>Title</title></head></html>"
+        result = parse(html_str)
+        assert isinstance(result, Page)
+        assert result.head is not None
+        assert "Title" in str(result.head)
+
+    with subtests.test("self-closing tag with classes"):
+        html_str = '<img class="logo primary" src="logo.png"/>'
+        result = parse(html_str)
+        assert isinstance(result, Tag)
+        assert "logo" in result.classes
+        assert "primary" in result.classes
+
+    with subtests.test("html with text children"):
+        # Tests branches where children are strings, not Tags
+        html_str = "<html>text before<head></head>text between<body>content</body>text after</html>"
+        result = parse(html_str)
+        assert isinstance(result, Page)
+
+    with subtests.test("html with other tag children"):
+        # Tests branch where html has Tag children that aren't head or body
+        html_str = "<html><footer>footer</footer><head></head><body>content</body><nav>nav</nav></html>"
+        result = parse(html_str)
+        assert isinstance(result, Page)
+        # Should still extract head and body correctly
+        assert result.body is not None
+        assert result.head is not None
+
+    with subtests.test("html with non-string attributes"):
+        # Create a parser and manually add non-string attributes
+        from tagz import TagParser
+
+        parser = TagParser()
+        parser.feed("<html><body>test</body></html>")
+        parser.close()
+        # Get the html tag before conversion
+        html_tag = parser.root_elements[0]
+        # Add a non-string attribute (callable)
+        html_tag.attributes["data-func"] = lambda: "value"
+        # Now get result - should filter out callable attribute
+        result = parser.get_result()
+        assert isinstance(result, Page)
+
+    with subtests.test("head with text children"):
+        # Tests branch where head has text children
+        html_str = (
+            "<html><head>text node<title>T</title>more text</head><body>b</body></html>"
+        )
+        result = parse(html_str)
+        assert isinstance(result, Page)
+        # Head tags should only include Tag children
+        assert len(result.head.children) >= 1
+
+    with subtests.test("malformed end tag"):
+        # Tests branch where end tag is encountered with empty stack
+        parser = TagParser()
+        parser.feed("<div>content</div>")
+        parser.feed("</extra>")  # Extra end tag
+        parser.close()
+        result = parser.get_result()
+        assert isinstance(result, Tag)
