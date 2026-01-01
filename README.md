@@ -7,8 +7,38 @@
 
 # `tagz`
 
-`tagz` – is an extremely simple library for building html documents without using templates, 
-just with python code.
+A lightweight, type-safe Python library for building and parsing HTML documents programmatically without templates.
+
+## Overview
+
+`tagz` lets you construct HTML using pure Python code with a clean, intuitive API. No template engines, no DSLs—just Python functions and objects that map directly to HTML elements.
+
+**Key Features:**
+
+- **Programmatic HTML Construction** - Build HTML documents using Python objects and methods
+- **HTML Parser** - Parse existing HTML strings back into manipulable Tag objects
+- **Type-Safe** - Full mypy support with comprehensive type annotations
+- **Streaming Support** - Memory-efficient rendering with `iter_lines()`, `iter_chunk()`, and `iter_string()`
+- **Automatic Escaping** - XSS protection enabled by default with HTML entity escaping
+- **Performance Optimized** - LRU caching and zero-copy optimizations for speed
+- **CSS Helpers** - Built-in `Style` and `StyleSheet` objects for inline and embedded styles
+- **Fragment Support** - Group elements without wrapper tags (like React Fragments)
+- **Page Objects** - High-level API for complete HTML documents with DOCTYPE support
+
+**Perfect for:**
+- Generating HTML emails and reports
+- Building web UIs without JavaScript frameworks
+- Creating dynamic documentation
+- Programmatic HTML manipulation and transformation
+- Server-side rendering in Python web applications
+
+## Installation
+
+```bash
+pip install tagz
+```
+
+## Quick Start
 
 <!-- name: test_page_render -->
 ```python
@@ -298,6 +328,115 @@ assert pretty_result == "<div>\n\t<p>\n\t\tHello\n\t</p>\n</div>\n"
 ```
 
 All these methods are useful when generating large HTML documents where you want to stream the output without building the entire string in memory.
+
+## Parsing HTML
+
+The `parse()` function converts HTML strings back into Tag objects, allowing you to manipulate existing HTML programmatically.
+
+### Basic Parsing
+
+<!-- name: test_parse_basic -->
+```python
+from tagz import parse
+
+# Parse a simple HTML string
+tag = parse("<div><p>Hello</p></div>")
+assert tag.name == "div"
+assert len(tag.children) == 1
+assert str(tag) == "<div><p>Hello</p></div>"
+```
+
+### Parsing with Attributes and Classes
+
+<!-- name: test_parse_attributes -->
+```python
+from tagz import parse
+
+# Attributes and classes are preserved
+tag = parse('<div id="main" class="container primary">Content</div>')
+assert tag["id"] == "main"
+assert "container" in tag.classes
+assert "primary" in tag.classes
+
+# Modify the parsed tag
+tag["data-value"] = "test"
+tag.classes.add("active")
+```
+
+### Multiple Root Elements
+
+<!-- name: test_parse_fragment -->
+```python
+from tagz import parse, Fragment
+
+# Multiple root elements return a Fragment
+result = parse("<p>First</p><p>Second</p>")
+assert isinstance(result, Fragment)
+assert str(result) == "<p>First</p><p>Second</p>"
+```
+
+### Practical Example: Modifying Existing HTML
+
+<!-- name: test_parse_modify -->
+```python
+from tagz import parse, html
+
+# Parse existing HTML
+original = "<div><h1>Old Title</h1><p>Content</p></div>"
+tag = parse(original)
+
+# Modify the structure
+tag.children[0] = html.h1("New Title")
+tag.append(html.footer("Footer content"))
+
+# Generate modified HTML
+modified = str(tag)
+assert "New Title" in modified
+assert "Footer content" in modified
+```
+
+### Parsing Full HTML Documents
+
+When parsing a complete HTML document with an `<html>` tag, the parser automatically returns a `Page` object:
+
+<!-- name: test_parse_page -->
+```python
+from tagz import parse, Page
+
+# Parse a complete HTML document
+html_doc = """<!DOCTYPE html>
+<html lang="en">
+<head>
+    <title>My Page</title>
+    <meta charset="utf-8"/>
+</head>
+<body>
+    <h1>Welcome</h1>
+    <p>Content here</p>
+</body>
+</html>"""
+
+result = parse(html_doc)
+assert isinstance(result, Page)
+
+# Access page components
+assert result.body is not None
+assert "Welcome" in str(result.body)
+assert result.head is not None
+assert "My Page" in str(result.head)
+
+# DOCTYPE is preserved
+full_html = result.to_html5()
+assert full_html.startswith("<!DOCTYPE html>")
+```
+
+The parser automatically:
+- Decodes HTML entities (e.g., `&lt;` becomes `<`)
+- Handles void elements (`<br/>`, `<img/>`, etc.)
+- Preserves boolean attributes (e.g., `checked`, `disabled`)
+- Respects script/style tag behavior (unescaped content)
+- Returns `Page` objects for complete HTML documents with `<html>` tag
+- Preserves DOCTYPE declarations (HTML5, HTML4, XHTML, etc.)
 
 ## `Style` and `StyleSheet` helper objects
 

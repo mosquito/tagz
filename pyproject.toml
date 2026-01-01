@@ -1,11 +1,43 @@
 [project]
 name = "tagz"
-version = "0.6.2"
-description = "tagz is a html tags builder"
+version = "0.7.0"
+description = "A lightweight, type-safe Python library for building and parsing HTML documents programmatically without templates"
 authors = [{ name = "Dmitry Orlov", email = "orlovdl@gmail.com" }]
 requires-python = ">=3.10,<4"
 readme = "README.md"
-license = "MIT"
+license = { text = "MIT" }
+keywords = [
+    "html",
+    "builder",
+    "parser",
+    "template",
+    "generator",
+    "markup",
+    "dom",
+    "type-safe",
+    "streaming",
+]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
+    "Topic :: Internet :: WWW/HTTP :: Dynamic Content",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+    "Topic :: Text Processing :: Markup :: HTML",
+    "Typing :: Typed",
+]
+
+[project.urls]
+Homepage = "https://github.com/mosquito/tagz"
+Repository = "https://github.com/mosquito/tagz"
+Documentation = "https://github.com/mosquito/tagz#readme"
+"Bug Tracker" = "https://github.com/mosquito/tagz/issues"
 
 [dependency-groups]
 dev = [
