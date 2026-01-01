@@ -269,13 +269,13 @@ from functools import partial
 
 content = "Paragraph {}"
 # Create a large tag with many lazy evaluated children
-tag = html.div([partial(content.format, i) for i in range(10000)])
+tag = html.div(*[html.p(partial(content.format, i)) for i in range(1000)])
 
 # Pretty-printed chunks with custom indent
 chunks = list(tag.iter_chunk(chunk_size=1024, pretty=True, indent_char="  "))
 
-# Number of chunks in this case should be 781
-assert len(chunks) == 781, len(chunks)
+# Verify reconstruction works correctly
+assert "".join(chunks) == tag.to_string(pretty=True).replace("\t", "  ")
 ```
 
 ### `iter_string()` - Fragment-by-fragment iteration
