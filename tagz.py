@@ -196,7 +196,7 @@ class Tag:
     def __str__(self) -> str:
         return self.to_string()
 
-    def _to_string(self, indent="", indent_str="") -> Iterable[str]:
+    def _to_string(self, indent: str = "", indent_str: str = "") -> Iterable[str]:
         yield indent
         yield from self._format_tag_open()
 
@@ -398,13 +398,13 @@ class Raw(Tag):
     def __init__(self, content: str):
         super().__init__("", content, _escaped=False)
 
-    def _format_tag_open(self):
-        yield ""
-    
-    def _format_tag_close(self):
+    def _format_tag_open(self) -> Iterator[str]:
         yield ""
 
-    def _to_string(self, indent="", indent_str=""):
+    def _format_tag_close(self) -> Iterator[str]:
+        yield ""
+
+    def _to_string(self, indent: str = "", indent_str: str = "") -> Iterable[str]:
         return super()._to_string("", "")
 
 
