@@ -24,6 +24,9 @@ from typing import (
     Callable,
 )
 
+# Cache HTML escape for performance with repeated strings
+escape = lru_cache(maxsize=512)(escape)
+
 
 class Style(Dict[str, Any]):
     def __init__(self, *args: Any, **kwargs: Any):
@@ -346,8 +349,16 @@ class TagInstance(Tag):
     ):
         attrs: Dict[str, AttributeType] = dict(self.__default_attributes__ or {})
         attrs.update(**attributes)
+        # Optimize: avoid chain() overhead if no default children
+        children_iter = (
+            chain(self.__default_children__, _children)
+            if self.__default_children__
+            else _children
+        )
         _children = tuple(
-            copy(item) for item in chain(self.__default_children__, _children)
+            # No need to copy strings
+            item if isinstance(item, str) else copy(item)
+            for item in children_iter
         )
 
         super().__init__(
@@ -360,7 +371,9 @@ class TagInstance(Tag):
         )
 
     def __copy__(self) -> "TagInstance":
-        children = tuple(copy(item) for item in self.children)
+        children = tuple(
+            item if isinstance(item, str) else copy(item) for item in self.children
+        )
         return self.__class__(*children, classes=copy(self.classes), **self.attributes)
 
 
