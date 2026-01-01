@@ -6,7 +6,6 @@ from functools import lru_cache
 from html import escape
 from pathlib import Path
 from itertools import chain
-from textwrap import indent
 from types import MappingProxyType
 from typing import (
     Any,
@@ -24,6 +23,9 @@ from typing import (
     Union,
     Callable,
 )
+
+# Cache HTML escape for performance with repeated strings
+escape = lru_cache(maxsize=512)(escape)
 
 
 class Style(Dict[str, Any]):
@@ -160,7 +162,7 @@ class Tag:
             return ""
         return f'class="{" ".join(sorted(self.classes))}"'
 
-    def __make_parts(self) -> Iterator[str]:
+    def _make_parts(self) -> Iterator[str]:
         yield self.name
         classes = self._format_classes()
 
@@ -171,56 +173,165 @@ class Tag:
         if attributes:
             yield attributes
 
+    def _format_tag_open(self) -> Iterable[str]:
+        yield "<"
+        yield " ".join(self._make_parts())
+        if self._void:
+            yield "/>"
+            return
+        yield ">"
+
+    def _format_tag_close(self) -> Iterable[str]:
+        if self._void:
+            return
+        yield f"</{self.name}>"
+
     def __repr__(self) -> str:
-        if not self._void:
-            return f"<{' '.join(self.__make_parts())}>{'...' if self.children else ''}</{self.name}>"
-        else:
-            return f"<{' '.join(self.__make_parts())}/>"
+        parts = ["".join(self._format_tag_open())]
+        if self._void:
+            parts.append("".join(self._format_tag_close()))
+            return "".join(parts)
+
+        parts.append(f"{'...' if self.children else ''}")
+        parts.append(f"</{self.name}>")
+        return "".join(parts)
 
     def __str__(self) -> str:
         return self.to_string()
 
-    def _to_string(self) -> List[str]:
-        parts = [f"<{' '.join(self.__make_parts())}"]
-        if self._void:
-            parts.append(f"/>")
-            return parts
+    def _to_string(self, indent: str = "", indent_str: str = "") -> Iterable[str]:
+        yield indent
+        yield from self._format_tag_open()
 
-        parts.append(">")
+        if indent_str:
+            yield "\n"
+
+        if self._void:
+            yield from self._format_tag_close()
+            return
+
         for child in self.children:
             if callable(child):
                 child = child()
                 if isinstance(child, str) and self._escaped:
                     child = escape(child)
+
             if isinstance(child, Tag):
-                parts.extend(child._to_string())
+                yield from child._to_string(indent + indent_str, indent_str)
             else:
-                parts.append(str(child))
-        parts.append(f"</{self.name}>")
-        return parts
-
-    def _to_pretty_string(self, _indent: str = "") -> List[str]:
-        parts = [f"<{' '.join(self.__make_parts())}"]
-        if self._void:
-            parts.append(f"/>\n")
-            return [indent("".join(parts), _indent)]
-
-        parts.append(">\n")
-        for child in self.children:
-            value = child() if callable(child) else child
-            if isinstance(value, Tag):
-                parts.extend(value._to_pretty_string("\t"))
-            else:
-                child_str = str(value)
+                child_str = str(child)
                 if not child_str:
+                    # Only output non-empty strings
                     continue
-                parts.append(indent(child_str, _indent if _indent else "\t"))
-                parts.append(f"\n")
-        parts.append(f"</{self.name}>\n")
-        return [indent("".join(parts), _indent)]
+
+                if indent_str and "\n" in child_str:
+                    # Handle multi-line strings in pretty mode
+                    lines = child_str.split("\n")
+                    for line in lines:
+                        yield indent
+                        yield indent_str
+                        yield line
+                        yield "\n"
+                    continue
+
+                yield indent
+                yield indent_str
+                yield child_str
+                if indent_str:
+                    yield "\n"
+        yield indent
+        yield from self._format_tag_close()
+        if indent_str:
+            yield "\n"
+
+    def iter_string(self, pretty: bool = False) -> Iterator[str]:
+        yield from self._to_string("", "\t" if pretty else "")
+
+    def iter_lines(self, indent_char: str = "\t") -> Iterator[str]:
+        """
+        Iterate over the pretty-printed HTML output line by line.
+
+        This method always formats with indentation and yields complete lines
+        without trailing newlines. Useful for streaming HTML output line by line
+        to files or network sockets.
+
+        Args:
+            indent_char: The character(s) to use for indentation. Defaults to tab.
+
+        Yields:
+            Lines of HTML without trailing newlines.
+
+        Example:
+            >>> tag = html.div(html.p("Hello"), html.p("World"))
+            >>> for line in tag.iter_lines():
+            ...     print(line)
+            <div>
+                <p>
+                    Hello
+                </p>
+                <p>
+                    World
+                </p>
+            </div>
+        """
+        accu = ""
+        for chunk in self._to_string("", indent_char):
+            if "\n" in chunk:
+                parts = chunk.split("\n")
+                # Yield all complete lines (everything before the last part)
+                for part in parts[:-1]:
+                    yield accu + part
+                    accu = ""
+                # Keep the remainder for the next line
+                accu = parts[-1]
+            else:
+                accu += chunk
+
+        # Yield any remaining content
+        if accu:
+            yield accu
+
+    def iter_chunk(
+        self, chunk_size: int = 4096, pretty: bool = False, indent_char: str = "\t"
+    ) -> Iterator[str]:
+        """
+        Iterate over the HTML output in fixed-size chunks.
+
+        This method accumulates HTML output and yields chunks of approximately
+        the specified size. Useful for streaming large HTML documents over
+        network connections or writing to buffered outputs with specific
+        buffer sizes.
+
+        Args:
+            chunk_size: Target size for each chunk in bytes. Defaults to 4096.
+                       The actual chunk size may be slightly larger to avoid
+                       breaking in the middle of a fragment.
+            pretty: If True, format with indentation and newlines.
+            indent_char: The character(s) to use for indentation when pretty=True.
+                        Defaults to tab character.
+
+        Yields:
+            Chunks of HTML as strings, each approximately chunk_size bytes.
+
+        Example:
+            >>> tag = html.div(html.p("Hello") * 1000)
+            >>> for chunk in tag.iter_chunk(chunk_size=1024):
+            ...     socket.send(chunk.encode())
+        """
+        buffer = ""
+        for fragment in self._to_string("", indent_char if pretty else ""):
+            buffer += fragment
+            # Yield chunks when buffer exceeds chunk_size
+            while len(buffer) >= chunk_size:
+                yield buffer[:chunk_size]
+                buffer = buffer[chunk_size:]
+
+        # Yield any remaining content
+        if buffer:
+            yield buffer
 
     def to_string(self, pretty: bool = False) -> str:
-        return "".join(self._to_pretty_string() if pretty else self._to_string())
+        return "".join(self.iter_string(pretty=pretty))
 
 
 class TagInstance(Tag):
@@ -238,8 +349,16 @@ class TagInstance(Tag):
     ):
         attrs: Dict[str, AttributeType] = dict(self.__default_attributes__ or {})
         attrs.update(**attributes)
+        # Optimize: avoid chain() overhead if no default children
+        children_iter = (
+            chain(self.__default_children__, _children)
+            if self.__default_children__
+            else _children
+        )
         _children = tuple(
-            copy(item) for item in chain(self.__default_children__, _children)
+            # No need to copy strings
+            item if isinstance(item, str) else copy(item)
+            for item in children_iter
         )
 
         super().__init__(
@@ -252,7 +371,9 @@ class TagInstance(Tag):
         )
 
     def __copy__(self) -> "TagInstance":
-        children = tuple(copy(item) for item in self.children)
+        children = tuple(
+            item if isinstance(item, str) else copy(item) for item in self.children
+        )
         return self.__class__(*children, classes=copy(self.classes), **self.attributes)
 
 
@@ -278,6 +399,36 @@ class HTML:
 
     def __getattr__(self, tag_name: str) -> Type[TagInstance]:
         return self[tag_name.replace("_", "-")]
+
+
+class Fragment(Tag):
+    """
+    A Fragment necessary to group children without adding extra tags.
+    Each child maintains its own escaping behavior.
+    """
+
+    def __init__(self, *_children: ChildType, _escaped: bool = True):
+        super().__init__("", *_children, _escaped=_escaped)
+
+    def _format_tag_open(self) -> Iterator[str]:
+        yield ""
+
+    def _format_tag_close(self) -> Iterator[str]:
+        yield ""
+
+    def _to_string(self, indent: str = "", indent_str: str = "") -> Iterable[str]:
+        return super()._to_string("", "")
+
+
+class Raw(Fragment):
+    """
+    A Tag that renders raw, unwrapped content.
+    It is completely unescaped and really unsafe against XSS.
+    The best practice is to avoid using this unless absolutely necessary.
+    """
+
+    def __init__(self, content: str):
+        super().__init__("", content, _escaped=False)
 
 
 _void = MappingProxyType({"__void__": True})
@@ -360,14 +511,16 @@ def open_data_uri(file_path: Union[str, Path], media_type: Optional[str] = None)
 
 
 __all__ = (
+    "ABSENT",
+    "data_uri",
+    "Fragment",
+    "html",
     "HTML",
+    "open_data_uri",
     "Page",
+    "Raw",
     "Style",
     "StyleSheet",
     "Tag",
     "TagInstance",
-    "html",
-    "data_uri",
-    "open_data_uri",
-    "ABSENT",
 )

@@ -160,21 +160,144 @@ assert str(html.my_custom_tag("hello")) == "<my-custom-tag>hello</my-custom-tag>
 
 You can pretty print the html output with `to_string(pretty=True)` or `to_html5(pretty=True)` methods:
 
+<!-- name: test_pretty_printing -->
 ```python
 from tagz import html
 
-print(
-    html.div(
-        "Hello", html.strong("world"),
-    ).to_string(pretty=True)
-)
-#<div>
-#	Hello
-#	<strong>
-#		world
-#	</strong>
-#</div>
+result = html.div(
+    "Hello", html.strong("world"),
+).to_string(pretty=True)
+
+assert result == "<div>\n\tHello\n\t<strong>\n\t\tworld\n\t</strong>\n</div>\n"
 ```
+
+## Iterating string generation
+
+For memory-efficient or streaming scenarios, `tagz` provides three methods for incremental HTML generation:
+
+### `iter_lines()` - Line-by-line iteration (recommended)
+
+The `iter_lines()` method yields complete lines of pretty-printed HTML, making it ideal for streaming to files or network sockets:
+
+<!-- name: test_iter_lines_basic -->
+```python
+from tagz import html
+
+tag = html.div(
+    html.p("First paragraph"),
+    html.p("Second paragraph"),
+)
+
+# Iterate line by line (always pretty-printed)
+lines = list(tag.iter_lines())
+assert lines == [
+    "<div>",
+    "\t<p>",
+    "\t\tFirst paragraph",
+    "\t</p>",
+    "\t<p>",
+    "\t\tSecond paragraph",
+    "\t</p>",
+    "</div>",
+]
+```
+
+You can customize the indentation character:
+
+<!-- name: test_iter_lines_indent -->
+```python
+from tagz import html
+
+tag = html.div(html.p("Hello"))
+
+# Customize indentation (default is tab)
+lines = list(tag.iter_lines(indent_char="  "))
+assert lines == [
+    "<div>",
+    "  <p>",
+    "    Hello",
+    "  </p>",
+    "</div>",
+]
+```
+
+Stream to a file:
+
+<!-- name: test_iter_lines_file -->
+```python
+from tagz import html
+from tempfile import NamedTemporaryFile
+
+tag = html.div(html.p("Content"))
+
+# Stream to a file
+with NamedTemporaryFile(mode="w", suffix=".html", delete=True) as f:
+    for line in tag.iter_lines():
+        f.write(line + "\n")
+    f.flush()
+```
+
+### `iter_chunk()` - Fixed-size chunk iteration
+
+The `iter_chunk()` method yields HTML in fixed-size chunks, perfect for network transmission or buffered I/O:
+
+<!-- name: test_iter_chunk_basic -->
+```python
+from tagz import html
+
+tag = html.div(
+    html.p("First paragraph with some content"),
+    html.p("Second paragraph with more content"),
+)
+
+# Generate HTML in 50-byte chunks
+chunks = list(tag.iter_chunk(chunk_size=50))
+
+# Each chunk is approximately 50 bytes (except possibly the last one)
+assert all(len(chunk) <= 50 or chunk == chunks[-1] for chunk in chunks)
+
+# Verify reconstruction
+assert "".join(chunks) == tag.to_string()
+```
+
+You can use it with pretty printing and custom indentation:
+
+<!-- name: test_iter_chunk_pretty -->
+```python
+from tagz import html
+from functools import partial
+
+content = "Paragraph {}"
+# Create a large tag with many lazy evaluated children
+tag = html.div(*[html.p(partial(content.format, i)) for i in range(1000)])
+
+# Pretty-printed chunks with custom indent
+chunks = list(tag.iter_chunk(chunk_size=1024, pretty=True, indent_char="  "))
+
+# Verify reconstruction works correctly
+assert "".join(chunks) == tag.to_string(pretty=True).replace("\t", "  ")
+```
+
+### `iter_string()` - Fragment-by-fragment iteration
+
+The `iter_string()` method yields tiny fragments of HTML as they are generated, useful for very fine-grained control:
+
+<!-- name: test_iter_string -->
+```python
+from tagz import html
+
+tag = html.div(html.p("Hello"))
+
+# Generate HTML in small fragments (non-pretty)
+result = "".join(tag.iter_string())
+assert result == "<div><p>Hello</p></div>"
+
+# Also works with pretty printing
+pretty_result = "".join(tag.iter_string(pretty=True))
+assert pretty_result == "<div>\n\t<p>\n\t\tHello\n\t</p>\n</div>\n"
+```
+
+All these methods are useful when generating large HTML documents where you want to stream the output without building the entire string in memory.
 
 ## `Style` and `StyleSheet` helper objects
 
@@ -239,6 +362,96 @@ assert str(style) == "<style>body {margin: 0; padding: 0;}</style>"
 script = html.script('''console.log(1 > 2 && 3 < 2 && "0" === '0');''')
 assert str(script) == '''<script>console.log(1 > 2 && 3 < 2 && "0" === '0');</script>'''
 ```
+
+## Fragment - Grouping Without Wrappers
+
+Use the `Fragment` class to group multiple elements without adding a wrapper tag. This is similar to React's Fragment and is useful when you need to return multiple elements but don't want to add an extra `<div>` or other container:
+
+<!-- name: test_fragment_basic -->
+```python
+from tagz import html, Fragment
+
+# Fragment groups children without adding wrapper tags
+fragment = Fragment(
+    html.h1("Title"),
+    html.p("First paragraph"),
+    html.p("Second paragraph"),
+)
+
+assert str(fragment) == "<h1>Title</h1><p>First paragraph</p><p>Second paragraph</p>"
+```
+
+Fragments are especially useful when returning multiple elements from functions or conditionals:
+
+<!-- name: test_fragment_function -->
+```python
+from tagz import html, Fragment
+
+def render_header(show_subtitle=True):
+    if show_subtitle:
+        return Fragment(
+            html.h1("Main Title"),
+            html.h2("Subtitle"),
+        )
+    return html.h1("Main Title")
+
+# With subtitle - returns multiple elements without wrapper
+header_with_subtitle = render_header(True)
+assert str(header_with_subtitle) == "<h1>Main Title</h1><h2>Subtitle</h2>"
+
+# Without subtitle - returns single element
+header_simple = render_header(False)
+assert str(header_simple) == "<h1>Main Title</h1>"
+```
+
+Fragments can be used as children of other tags:
+
+<!-- name: test_fragment_nested -->
+```python
+from tagz import html, Fragment
+
+container = html.div(
+    html.header("Header"),
+    Fragment(
+        html.p("Paragraph 1"),
+        html.p("Paragraph 2"),
+    ),
+    html.footer("Footer"),
+)
+
+expected = (
+    "<div>"
+    "<header>Header</header>"
+    "<p>Paragraph 1</p><p>Paragraph 2</p>"
+    "<footer>Footer</footer>"
+    "</div>"
+)
+assert str(container) == expected
+```
+
+**Note:** Fragments maintain the escaping behavior of their children but render them without indentation in pretty mode to maintain transparency.
+
+## Raw HTML Content
+
+Use the `Raw` class to embed completely unescaped HTML content. This is useful when you have pre-rendered HTML fragments or need to bypass all escaping:
+
+<!-- name: test_raw_html -->
+```python
+from tagz import html, Raw
+
+# Create raw HTML content (not escaped, no wrapper tags)
+raw = Raw("<div>raw content & more</div>")
+assert str(raw) == "<div>raw content & more</div>"
+
+# Can be used as a child of other tags
+container = html.div(raw)
+assert str(container) == "<div><div>raw content & more</div></div>"
+
+# Raw content is never indented in pretty mode
+assert raw.to_string(pretty=True) == "<div>raw content & more</div>"
+```
+
+**Warning:** `Raw` is completely unescaped and unsafe against XSS attacks. Only use it with trusted content or when you have already sanitized the HTML.
 
 ## Tag classes API
 

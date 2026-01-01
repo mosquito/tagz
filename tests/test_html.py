@@ -2,7 +2,7 @@ from copy import copy
 
 import pytest
 
-from tagz import HTML, Page, Style, StyleSheet, Tag, html, ABSENT
+from tagz import HTML, Page, Style, StyleSheet, Tag, html, ABSENT, Raw, Fragment
 
 
 @pytest.fixture
@@ -393,3 +393,270 @@ def test_webpage():
     )
 
     assert page.to_html5(True).strip() == TEST_PAGE.strip()
+
+
+def test_fragment(subtests):
+    with subtests.test("basic fragment with multiple children"):
+        fragment = Fragment(
+            html.h1("Title"),
+            html.p("Paragraph 1"),
+            html.p("Paragraph 2"),
+        )
+        expected = "<h1>Title</h1><p>Paragraph 1</p><p>Paragraph 2</p>"
+        assert str(fragment) == expected
+
+    with subtests.test("fragment as child of another tag"):
+        fragment = Fragment(
+            html.h1("Title"),
+            html.p("Paragraph 1"),
+            html.p("Paragraph 2"),
+        )
+        container = html.div(fragment)
+        expected_container = (
+            "<div><h1>Title</h1><p>Paragraph 1</p><p>Paragraph 2</p></div>"
+        )
+        assert str(container) == expected_container
+
+    with subtests.test("fragment with text content"):
+        text_fragment = Fragment("Hello ", html.strong("world"), "!")
+        assert str(text_fragment) == "Hello <strong>world</strong>!"
+
+    with subtests.test("fragment with mixed content"):
+        mixed = Fragment(
+            "Text before",
+            html.span("span content"),
+            "Text after",
+        )
+        assert str(mixed) == "Text before<span>span content</span>Text after"
+
+    with subtests.test("empty fragment"):
+        empty = Fragment()
+        assert str(empty) == ""
+
+    with subtests.test("fragment in pretty mode"):
+        pretty_fragment = Fragment(
+            html.p("First"),
+            html.p("Second"),
+        )
+        # Fragment itself doesn't add structure in pretty mode
+        assert pretty_fragment.to_string(pretty=True) == "<p>First</p><p>Second</p>"
+
+    with subtests.test("fragment inside container with pretty mode"):
+        # Note: Fragment renders children without indentation to maintain transparency
+        container_pretty = html.div(
+            html.h1("Title"),
+            Fragment(
+                html.p("Paragraph 1"),
+                html.p("Paragraph 2"),
+            ),
+        )
+        expected_pretty = (
+            "<div>\n"
+            "\t<h1>\n"
+            "\t\tTitle\n"
+            "\t</h1>\n"
+            "<p>Paragraph 1</p><p>Paragraph 2</p>"
+            "</div>\n"
+        )
+        assert container_pretty.to_string(pretty=True) == expected_pretty
+
+    with subtests.test("fragment maintains escaping behavior"):
+        escaped_fragment = Fragment(
+            "<script>alert('xss')</script>",
+            html.p("safe content"),
+        )
+        assert (
+            str(escaped_fragment)
+            == "&lt;script&gt;alert(&#x27;xss&#x27;)&lt;/script&gt;<p>safe content</p>"
+        )
+
+    with subtests.test("fragment with callable children"):
+
+        def get_content():
+            return "dynamic content"
+
+        callable_fragment = Fragment(
+            html.p("static"),
+            get_content,
+        )
+        assert str(callable_fragment) == "<p>static</p>dynamic content"
+
+    with subtests.test("nested fragments"):
+        nested = Fragment(
+            html.div("outer"),
+            Fragment(
+                html.span("inner 1"),
+                html.span("inner 2"),
+            ),
+        )
+        assert str(nested) == "<div>outer</div><span>inner 1</span><span>inner 2</span>"
+
+
+def test_raw():
+    raw = Raw("<div>raw content & more</div>")
+    assert str(raw) == "<div>raw content & more</div>"
+
+    container = html.div(raw)
+    assert str(container) == "<div><div>raw content & more</div></div>"
+
+    assert raw.to_string(pretty=True) == "<div>raw content & more</div>"
+
+
+def test_iter_lines():
+    # Test basic iteration
+    tag = html.div(
+        html.p("Hello"),
+        html.p("World"),
+    )
+
+    lines = list(tag.iter_lines())
+    expected_lines = [
+        "<div>",
+        "\t<p>",
+        "\t\tHello",
+        "\t</p>",
+        "\t<p>",
+        "\t\tWorld",
+        "\t</p>",
+        "</div>",
+    ]
+    assert lines == expected_lines
+
+    # Test with custom indent character
+    lines_spaces = list(tag.iter_lines(indent_char="  "))
+    expected_spaces = [
+        "<div>",
+        "  <p>",
+        "    Hello",
+        "  </p>",
+        "  <p>",
+        "    World",
+        "  </p>",
+        "</div>",
+    ]
+    assert lines_spaces == expected_spaces
+
+    # Test that joining lines with newlines gives same result as to_string(pretty=True)
+    assert "\n".join(tag.iter_lines()) + "\n" == tag.to_string(pretty=True)
+
+    # Test with nested tags
+    nested = html.div(
+        html.section(
+            html.p("Nested content"),
+        ),
+    )
+    nested_lines = list(nested.iter_lines())
+    assert nested_lines == [
+        "<div>",
+        "\t<section>",
+        "\t\t<p>",
+        "\t\t\tNested content",
+        "\t\t</p>",
+        "\t</section>",
+        "</div>",
+    ]
+
+    # Test with void elements
+    void_tag = html.div(html.br(), "text", html.hr())
+    void_lines = list(void_tag.iter_lines())
+    assert void_lines == [
+        "<div>",
+        "\t<br/>",
+        "\ttext",
+        "\t<hr/>",
+        "</div>",
+    ]
+
+    # Test with multi-line string content (like StyleSheet)
+    style_content = "body {margin: 0;}\n.container {padding: 10px;}"
+    style_tag = html.style(style_content)
+    style_lines = list(style_tag.iter_lines())
+    assert style_lines == [
+        "<style>",
+        "\tbody {margin: 0;}",
+        "\t.container {padding: 10px;}",
+        "</style>",
+    ]
+
+    # Test empty tag
+    empty = html.div()
+    empty_lines = list(empty.iter_lines())
+    assert empty_lines == ["<div>", "</div>"]
+
+    # Test single text content
+    simple = html.p("Simple text")
+    simple_lines = list(simple.iter_lines())
+    assert simple_lines == [
+        "<p>",
+        "\tSimple text",
+        "</p>",
+    ]
+
+
+def test_iter_chunk():
+    # Test basic chunking
+    tag = html.div(
+        html.p("Hello World"),
+        html.p("Second paragraph"),
+    )
+
+    # Small chunk size to force multiple chunks
+    chunks = list(tag.iter_chunk(chunk_size=10))
+    # Verify we got multiple chunks
+    assert len(chunks) > 1
+    # Verify joining chunks gives the same result as to_string
+    assert "".join(chunks) == tag.to_string()
+
+    # Test with pretty mode
+    pretty_chunks = list(tag.iter_chunk(chunk_size=20, pretty=True))
+    assert len(pretty_chunks) > 1
+    assert "".join(pretty_chunks) == tag.to_string(pretty=True)
+
+    # Test with custom indent character
+    indent_chunks = list(tag.iter_chunk(chunk_size=15, pretty=True, indent_char="  "))
+    assert "".join(indent_chunks) == tag.to_string(pretty=True).replace("\t", "  ")
+
+    # Test exact chunk size behavior
+    simple = html.div("A" * 100)  # Create content longer than chunk_size
+    chunks_50 = list(simple.iter_chunk(chunk_size=50))
+    # Each chunk (except possibly the last) should be exactly 50 chars
+    for chunk in chunks_50[:-1]:
+        assert len(chunk) == 50
+    # Verify reconstruction
+    assert "".join(chunks_50) == simple.to_string()
+
+    # Test with very large chunk size (should get single chunk)
+    large_chunks = list(tag.iter_chunk(chunk_size=10000))
+    assert len(large_chunks) == 1
+    assert large_chunks[0] == tag.to_string()
+
+    # Test empty tag
+    empty = html.div()
+    empty_chunks = list(empty.iter_chunk(chunk_size=10))
+    assert "".join(empty_chunks) == "<div></div>"
+
+    # Test nested complex structure
+    nested = html.div(
+        html.section(
+            html.article(
+                html.p("Content " * 20),
+                html.p("More content " * 20),
+            )
+        )
+    )
+    nested_chunks = list(nested.iter_chunk(chunk_size=100))
+    assert len(nested_chunks) > 1
+    assert "".join(nested_chunks) == nested.to_string()
+
+    # Test with void elements
+    void_tag = html.div(html.br(), html.hr(), html.img(src="test.png"))
+    void_chunks = list(void_tag.iter_chunk(chunk_size=15))
+    assert "".join(void_chunks) == void_tag.to_string()
+
+    # Test chunk size of 1 (edge case)
+    tiny = html.p("Hi")
+    tiny_chunks = list(tiny.iter_chunk(chunk_size=1))
+    # Should have multiple single-character chunks
+    assert len(tiny_chunks) > 1
+    assert all(len(chunk) <= 1 for chunk in tiny_chunks)
+    assert "".join(tiny_chunks) == tiny.to_string()
