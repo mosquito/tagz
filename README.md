@@ -363,6 +363,74 @@ script = html.script('''console.log(1 > 2 && 3 < 2 && "0" === '0');''')
 assert str(script) == '''<script>console.log(1 > 2 && 3 < 2 && "0" === '0');</script>'''
 ```
 
+## Fragment - Grouping Without Wrappers
+
+Use the `Fragment` class to group multiple elements without adding a wrapper tag. This is similar to React's Fragment and is useful when you need to return multiple elements but don't want to add an extra `<div>` or other container:
+
+<!-- name: test_fragment_basic -->
+```python
+from tagz import html, Fragment
+
+# Fragment groups children without adding wrapper tags
+fragment = Fragment(
+    html.h1("Title"),
+    html.p("First paragraph"),
+    html.p("Second paragraph"),
+)
+
+assert str(fragment) == "<h1>Title</h1><p>First paragraph</p><p>Second paragraph</p>"
+```
+
+Fragments are especially useful when returning multiple elements from functions or conditionals:
+
+<!-- name: test_fragment_function -->
+```python
+from tagz import html, Fragment
+
+def render_header(show_subtitle=True):
+    if show_subtitle:
+        return Fragment(
+            html.h1("Main Title"),
+            html.h2("Subtitle"),
+        )
+    return html.h1("Main Title")
+
+# With subtitle - returns multiple elements without wrapper
+header_with_subtitle = render_header(True)
+assert str(header_with_subtitle) == "<h1>Main Title</h1><h2>Subtitle</h2>"
+
+# Without subtitle - returns single element
+header_simple = render_header(False)
+assert str(header_simple) == "<h1>Main Title</h1>"
+```
+
+Fragments can be used as children of other tags:
+
+<!-- name: test_fragment_nested -->
+```python
+from tagz import html, Fragment
+
+container = html.div(
+    html.header("Header"),
+    Fragment(
+        html.p("Paragraph 1"),
+        html.p("Paragraph 2"),
+    ),
+    html.footer("Footer"),
+)
+
+expected = (
+    "<div>"
+    "<header>Header</header>"
+    "<p>Paragraph 1</p><p>Paragraph 2</p>"
+    "<footer>Footer</footer>"
+    "</div>"
+)
+assert str(container) == expected
+```
+
+**Note:** Fragments maintain the escaping behavior of their children but render them without indentation in pretty mode to maintain transparency.
+
 ## Raw HTML Content
 
 Use the `Raw` class to embed completely unescaped HTML content. This is useful when you have pre-rendered HTML fragments or need to bypass all escaping:

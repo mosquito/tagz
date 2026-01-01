@@ -2,7 +2,7 @@ from copy import copy
 
 import pytest
 
-from tagz import HTML, Page, Style, StyleSheet, Tag, html, ABSENT, Raw
+from tagz import HTML, Page, Style, StyleSheet, Tag, html, ABSENT, Raw, Fragment
 
 
 @pytest.fixture
@@ -393,6 +393,104 @@ def test_webpage():
     )
 
     assert page.to_html5(True).strip() == TEST_PAGE.strip()
+
+
+def test_fragment(subtests):
+    with subtests.test("basic fragment with multiple children"):
+        fragment = Fragment(
+            html.h1("Title"),
+            html.p("Paragraph 1"),
+            html.p("Paragraph 2"),
+        )
+        expected = "<h1>Title</h1><p>Paragraph 1</p><p>Paragraph 2</p>"
+        assert str(fragment) == expected
+
+    with subtests.test("fragment as child of another tag"):
+        fragment = Fragment(
+            html.h1("Title"),
+            html.p("Paragraph 1"),
+            html.p("Paragraph 2"),
+        )
+        container = html.div(fragment)
+        expected_container = (
+            "<div><h1>Title</h1><p>Paragraph 1</p><p>Paragraph 2</p></div>"
+        )
+        assert str(container) == expected_container
+
+    with subtests.test("fragment with text content"):
+        text_fragment = Fragment("Hello ", html.strong("world"), "!")
+        assert str(text_fragment) == "Hello <strong>world</strong>!"
+
+    with subtests.test("fragment with mixed content"):
+        mixed = Fragment(
+            "Text before",
+            html.span("span content"),
+            "Text after",
+        )
+        assert str(mixed) == "Text before<span>span content</span>Text after"
+
+    with subtests.test("empty fragment"):
+        empty = Fragment()
+        assert str(empty) == ""
+
+    with subtests.test("fragment in pretty mode"):
+        pretty_fragment = Fragment(
+            html.p("First"),
+            html.p("Second"),
+        )
+        # Fragment itself doesn't add structure in pretty mode
+        assert pretty_fragment.to_string(pretty=True) == "<p>First</p><p>Second</p>"
+
+    with subtests.test("fragment inside container with pretty mode"):
+        # Note: Fragment renders children without indentation to maintain transparency
+        container_pretty = html.div(
+            html.h1("Title"),
+            Fragment(
+                html.p("Paragraph 1"),
+                html.p("Paragraph 2"),
+            ),
+        )
+        expected_pretty = (
+            "<div>\n"
+            "\t<h1>\n"
+            "\t\tTitle\n"
+            "\t</h1>\n"
+            "<p>Paragraph 1</p><p>Paragraph 2</p>"
+            "</div>\n"
+        )
+        assert container_pretty.to_string(pretty=True) == expected_pretty
+
+    with subtests.test("fragment maintains escaping behavior"):
+        escaped_fragment = Fragment(
+            "<script>alert('xss')</script>",
+            html.p("safe content"),
+        )
+        assert (
+            str(escaped_fragment)
+            == "&lt;script&gt;alert(&#x27;xss&#x27;)&lt;/script&gt;<p>safe content</p>"
+        )
+
+    with subtests.test("fragment with callable children"):
+
+        def get_content():
+            return "dynamic content"
+
+        callable_fragment = Fragment(
+            html.p("static"),
+            get_content,
+        )
+        assert str(callable_fragment) == "<p>static</p>dynamic content"
+
+    with subtests.test("nested fragments"):
+        nested = Fragment(
+            html.div("outer"),
+            Fragment(
+                html.span("inner 1"),
+                html.span("inner 2"),
+            ),
+        )
+        assert str(nested) == "<div>outer</div><span>inner 1</span><span>inner 2</span>"
+
 
 def test_raw():
     raw = Raw("<div>raw content & more</div>")

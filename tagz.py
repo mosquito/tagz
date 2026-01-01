@@ -172,7 +172,7 @@ class Tag:
 
     def _format_tag_open(self) -> Iterable[str]:
         yield "<"
-        yield ' '.join(self._make_parts())
+        yield " ".join(self._make_parts())
         if self._void:
             yield "/>"
             return
@@ -221,9 +221,9 @@ class Tag:
                     # Only output non-empty strings
                     continue
 
-                if indent_str and '\n' in child_str:
+                if indent_str and "\n" in child_str:
                     # Handle multi-line strings in pretty mode
-                    lines = child_str.split('\n')
+                    lines = child_str.split("\n")
                     for line in lines:
                         yield indent
                         yield indent_str
@@ -388,15 +388,14 @@ class HTML:
         return self[tag_name.replace("_", "-")]
 
 
-class Raw(Tag):
+class Fragment(Tag):
     """
-    A Tag that renders raw, unwrapped content.
-    It is completely unescaped and really unsafe against XSS.
-    The best practice is to avoid using this unless absolutely necessary.
+    A Fragment necessary to group children without adding extra tags.
+    Each child maintains its own escaping behavior.
     """
 
-    def __init__(self, content: str):
-        super().__init__("", content, _escaped=False)
+    def __init__(self, *_children: ChildType, _escaped: bool = True):
+        super().__init__("", *_children, _escaped=_escaped)
 
     def _format_tag_open(self) -> Iterator[str]:
         yield ""
@@ -406,6 +405,17 @@ class Raw(Tag):
 
     def _to_string(self, indent: str = "", indent_str: str = "") -> Iterable[str]:
         return super()._to_string("", "")
+
+
+class Raw(Fragment):
+    """
+    A Tag that renders raw, unwrapped content.
+    It is completely unescaped and really unsafe against XSS.
+    The best practice is to avoid using this unless absolutely necessary.
+    """
+
+    def __init__(self, content: str):
+        super().__init__("", content, _escaped=False)
 
 
 _void = MappingProxyType({"__void__": True})
@@ -488,15 +498,16 @@ def open_data_uri(file_path: Union[str, Path], media_type: Optional[str] = None)
 
 
 __all__ = (
+    "ABSENT",
+    "data_uri",
+    "Fragment",
+    "html",
     "HTML",
+    "open_data_uri",
     "Page",
+    "Raw",
     "Style",
     "StyleSheet",
     "Tag",
     "TagInstance",
-    "html",
-    "data_uri",
-    "open_data_uri",
-    "ABSENT",
-    "Raw",
 )
