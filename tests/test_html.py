@@ -592,6 +592,22 @@ def test_iter_lines():
         "</p>",
     ]
 
+    # Test with no indentation (compact mode) - covers line 292 True branch
+    # When indent_char="", output has no newlines, so everything accumulates in accu
+    # and the final `if accu:` yields the accumulated content
+    compact = html.div(html.p("Hello"), html.span("World"))
+    compact_lines = list(compact.iter_lines(indent_char=""))
+    assert compact_lines == ["<div><p>Hello</p><span>World</span></div>"]
+    assert len(compact_lines) == 1
+
+    # Test compact mode with single tag
+    compact_single = html.p("text")
+    assert list(compact_single.iter_lines(indent_char="")) == ["<p>text</p>"]
+
+    # Test compact mode with void element
+    compact_void = html.div(html.br())
+    assert list(compact_void.iter_lines(indent_char="")) == ["<div><br/></div>"]
+
 
 def test_iter_chunk():
     # Test basic chunking
