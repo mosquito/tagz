@@ -509,6 +509,12 @@ class TagParser(HTMLParser):
         else:
             self.root_elements.append(tag_obj)
 
+        # Void elements cannot have children and have no end tag, so they must
+        # not be pushed onto the stack. Otherwise the next start tag would be
+        # appended as a child of the void element, which is invalid.
+        if tag_obj._void:
+            return
+
         # Push to stack (will be popped on endtag)
         self.stack.append(tag_obj)
 

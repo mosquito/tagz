@@ -933,3 +933,164 @@ def test_parse(subtests):
         parser.close()
         result = parser.get_result()
         assert isinstance(result, Tag)
+
+
+# All HTML5 void elements (cannot have children, written with no end tag).
+VOID_ELEMENTS = (
+    "area",
+    "base",
+    "br",
+    "col",
+    "embed",
+    "hr",
+    "img",
+    "input",
+    "link",
+    "meta",
+    "param",
+    "source",
+    "track",
+    "wbr",
+)
+
+
+def test_parse_void_without_slash_regression(subtests):
+    """Regression: void elements written without a trailing slash must not
+    swallow following siblings as children.
+
+    Previously the parser pushed void elements onto the element stack and never
+    popped them (HTMLParser emits no end tag for them), so the next start tag
+    was appended as a child of the void element, raising
+    ``ValueError: Cannot append children to a void element.``
+    """
+
+    with subtests.test("img followed by sibling, no slash"):
+        result = parse('<div><img src="x.webp" alt="test"><p>hello</p></div>')
+        assert isinstance(result, Tag)
+        assert result.name == "div"
+        assert len(result.children) == 2
+        img, p = result.children
+        assert isinstance(img, Tag) and img.name == "img"
+        assert img._void
+        assert isinstance(p, Tag) and p.name == "p"
+
+    with subtests.test("img followed by sibling, with whitespace"):
+        result = parse('<div><img src="x.webp" alt="test">\n<p>hello</p></div>')
+        assert isinstance(result, Tag)
+        # img, "\n" text node, p
+        tags = [c for c in result.children if isinstance(c, Tag)]
+        assert [t.name for t in tags] == ["img", "p"]
+
+    with subtests.test("leading/trailing whitespace around tags"):
+        result = parse('<div>\n<img src="x.webp" alt="test">\n<p>hello</p>\n</div>')
+        tags = [c for c in result.children if isinstance(c, Tag)]
+        assert [t.name for t in tags] == ["img", "p"]
+
+    with subtests.test("img followed by header"):
+        result = parse('<div><img src="x.webp" alt="test"><header>text</header></div>')
+        tags = [c for c in result.children if isinstance(c, Tag)]
+        assert [t.name for t in tags] == ["img", "header"]
+
+    with subtests.test("lone img without slash"):
+        result = parse('<img src="x.webp" alt="test">')
+        assert isinstance(result, Tag)
+        assert result.name == "img"
+        assert result["src"] == "x.webp"
+        assert result["alt"] == "test"
+
+    with subtests.test("consecutive void elements"):
+        result = parse("<div><br><br><hr></div>")
+        tags = [c for c in result.children if isinstance(c, Tag)]
+        assert [t.name for t in tags] == ["br", "br", "hr"]
+
+    with subtests.test("void element followed by text"):
+        result = parse("<div><br>after</div>")
+        assert "after" in str(result)
+        tags = [c for c in result.children if isinstance(c, Tag)]
+        assert [t.name for t in tags] == ["br"]
+
+    with subtests.test("input followed by label"):
+        result = parse('<div><input type="text"><label>Name</label></div>')
+        tags = [c for c in result.children if isinstance(c, Tag)]
+        assert [t.name for t in tags] == ["input", "label"]
+
+    with subtests.test("multiple void siblings in head"):
+        result = parse(
+            '<head><meta charset="utf-8"><link rel="stylesheet" href="a.css">'
+            "<title>T</title></head>"
+        )
+        tags = [c for c in result.children if isinstance(c, Tag)]
+        assert [t.name for t in tags] == ["meta", "link", "title"]
+
+    with subtests.test("nested containers with void elements"):
+        result = parse(
+            "<div><section><img src=a><p>x</p></section><hr><footer>y</footer></div>"
+        )
+        top = [c for c in result.children if isinstance(c, Tag)]
+        assert [t.name for t in top] == ["section", "hr", "footer"]
+        section = top[0]
+        inner = [c for c in section.children if isinstance(c, Tag)]
+        assert [t.name for t in inner] == ["img", "p"]
+
+    with subtests.test("every void element type with a sibling, no slash"):
+        for name in VOID_ELEMENTS:
+            result = parse(f"<div><{name}><p>sibling</p></div>")
+            tags = [c for c in result.children if isinstance(c, Tag)]
+            assert [t.name for t in tags] == [name, "p"], name
+            assert tags[0]._void, name
+
+
+def test_parse_void_slash_equivalence(subtests):
+    """``<img ...>`` and ``<img ... />`` must parse to the same thing."""
+
+    pairs = [
+        ('<img src="x.webp" alt="test">', '<img src="x.webp" alt="test" />'),
+        ("<div><br><p>x</p></div>", "<div><br/><p>x</p></div>"),
+        (
+            '<div><input name="a"><label>L</label></div>',
+            '<div><input name="a" /><label>L</label></div>',
+        ),
+        (
+            '<head><meta charset="utf-8"><title>T</title></head>',
+            '<head><meta charset="utf-8" /><title>T</title></head>',
+        ),
+    ]
+
+    for no_slash, with_slash in pairs:
+        with subtests.test(no_slash=no_slash):
+            assert str(parse(no_slash)) == str(parse(with_slash))
+
+    with subtests.test("every void element type, slash vs no slash"):
+        for name in VOID_ELEMENTS:
+            no_slash = f'<div><{name} class="c" data-x="1"><p>x</p></div>'
+            with_slash = f'<div><{name} class="c" data-x="1" /><p>x</p></div>'
+            assert str(parse(no_slash)) == str(parse(with_slash)), name
+
+    with subtests.test("void element attributes and classes preserved"):
+        result = parse('<img class="logo big" src="a.png" alt="hi"><p>next</p>')
+        # Wrapped in a Fragment (two roots)
+        assert isinstance(result, Fragment)
+        img = result.children[0]
+        assert isinstance(img, Tag) and img.name == "img"
+        assert img.classes == {"logo", "big"}
+        assert img["src"] == "a.png"
+        assert img["alt"] == "hi"
+
+
+def test_parse_void_roundtrip(subtests):
+    """Void elements without slashes round-trip to canonical self-closed form."""
+
+    cases = [
+        (
+            '<div><img src="x.webp" alt="test"><p>hello</p></div>',
+            '<div><img alt="test" src="x.webp"/><p>hello</p></div>',
+        ),
+        ("<br><br><hr>", "<br/><br/><hr/>"),
+        (
+            '<input type="text"><label>x</label>',
+            '<input type="text"/><label>x</label>',
+        ),
+    ]
+    for source, expected in cases:
+        with subtests.test(source=source):
+            assert str(parse(source)) == expected
