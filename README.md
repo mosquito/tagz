@@ -141,6 +141,7 @@ The full documentation is organised in the [Diátaxis](https://diataxis.fr/) sty
 | Streaming to file / socket / ASGI | [How-to: stream to a socket](https://mosquito.github.io/tagz/how-to/stream-to-socket.html) |
 | `data:` URIs for inline binary data | [How-to: embed binary data](https://mosquito.github.io/tagz/how-to/embed-binary-with-data-uri.html) |
 | Pre-resolving async data | [How-to: prefetch async data](https://mosquito.github.io/tagz/how-to/prefetch-async-data.html) |
+| Serving HTML fragments to htmx (aiohttp) | [How-to: htmx + aiohttp](https://mosquito.github.io/tagz/how-to/htmx-with-aiohttp.html) — full demo in [`examples/htmx-asyncio`](examples/htmx-asyncio/) |
 | Parsing existing HTML | [Tutorial: parse and modify](https://mosquito.github.io/tagz/tutorials/parsing-and-modifying.html) |
 
 ## License

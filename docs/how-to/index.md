@@ -19,6 +19,7 @@ fragments-vs-raw
 inline-and-embedded-css
 unescaped-script-style
 prefetch-async-data
+htmx-with-aiohttp
 ```
 
 ## Recipe index
@@ -49,3 +50,9 @@ prefetch-async-data
 - [Stream HTML to a socket](stream-to-socket.md)
 - [Convert a CSV file to an HTML table](csv-to-html-table.md)
 - [Embed binary data with a `data:` URI](embed-binary-with-data-uri.md)
+
+### Frameworks
+
+- [Serve HTML fragments to htmx](htmx-with-aiohttp.md) — minimal
+  aiohttp + htmx demo; a fuller version lives in
+  [`examples/htmx-asyncio`](https://github.com/mosquito/tagz/tree/master/examples/htmx-asyncio).
