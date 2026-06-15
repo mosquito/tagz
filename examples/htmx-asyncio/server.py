@@ -14,6 +14,7 @@ Then open http://127.0.0.1:8080/.
 
 from __future__ import annotations
 
+import json
 from datetime import datetime, timezone
 
 import aiohttp
@@ -23,6 +24,58 @@ from tagz import Fragment, Page, Style, StyleSheet, html
 
 
 PYPI_URL = "https://pypi.org/pypi/tagz/json"
+
+# Pin htmx to an exact version and its SRI hash. The browser verifies
+# the script bytes against the hash; any tampering and the script
+# refuses to load. Recompute on version bump:
+#   curl -sL "$HTMX_URL" | openssl dgst -sha384 -binary | openssl base64 -A
+HTMX_URL = "https://unpkg.com/htmx.org@2.0.3/dist/htmx.min.js"
+HTMX_SRI = "sha384-0895/pl2MU10Hqc6jd4RvrthNlDiE9U1tWmX7WRESftEDRosgxNsQG/Ze9YMRzHq"
+
+# Runtime config for htmx — read from the <meta name="htmx-config">
+# tag in the page head. Tightens the defaults:
+HTMX_CONFIG = {
+    "selfRequestsOnly": True,    # block cross-origin hx-* requests
+    "allowEval": False,          # refuse hx-on:* string handlers
+    "allowScriptTags": False,    # don't execute <script> in swapped HTML
+    "historyEnabled": False,     # don't cache fragments in localStorage
+}
+
+# Server-side state shared across all clients. In a real app this would
+# live in a database or per-session store — the rendering code below
+# wouldn't change.
+STATE: dict = {"counter": 0}
+
+# A modest Content-Security-Policy: only same-origin assets, only the
+# htmx CDN may run scripts, no framing.
+CSP = (
+    "default-src 'self'; "
+    "script-src 'self' https://unpkg.com; "
+    "style-src 'self' 'unsafe-inline'; "
+    "img-src 'self' data:; "
+    "connect-src 'self'; "
+    "object-src 'none'; "
+    "base-uri 'self'; "
+    "form-action 'self'; "
+    "frame-ancestors 'none'"
+)
+
+# Headers added to every HTML response.
+SECURITY_HEADERS = {
+    "Content-Security-Policy": CSP,
+    "X-Content-Type-Options": "nosniff",
+    "Referrer-Policy": "same-origin",
+}
+
+
+def html_response(body: str) -> web.Response:
+    """Build an HTML response with the security headers always set."""
+    return web.Response(
+        text=body,
+        content_type="text/html",
+        charset="utf-8",
+        headers=SECURITY_HEADERS,
+    )
 
 
 STYLES = StyleSheet({
@@ -84,7 +137,88 @@ STYLES = StyleSheet({
         color="#86868b",
         font_size="0.875rem",
     ),
+    "form": Style(display="flex", gap="0.5rem", flex_wrap="wrap"),
+    "input[type=text]": Style(
+        flex="1",
+        min_width="120px",
+        padding="0.4rem 0.6rem",
+        border="1px solid #d2d2d7",
+        border_radius="0.4rem",
+        font="inherit",
+    ),
+    ".counter": Style(
+        display="flex",
+        gap="0.75rem",
+        align_items="center",
+        font_size="1.5rem",
+        font_family="ui-monospace, SFMono-Regular, Menlo, monospace",
+    ),
+    ".counter button": Style(
+        width="2.25rem",
+        height="2.25rem",
+        padding="0",
+        font_size="1.25rem",
+        line_height="1",
+        margin_top="0",
+    ),
 })
+
+
+def card(title: str, *body, footer=None):
+    """Reusable component: a labelled card.
+
+    A "component" in tagz is just a function returning a tag — no
+    decorator, no special base class.
+    """
+    children = [html.h2(title), *body]
+    if footer is not None:
+        children.append(footer)
+    return html.div(*children, classes=["card"])
+
+
+def render_counter_value() -> str:
+    """The exact node that gets swapped on each +/- click."""
+    return str(html.span(str(STATE["counter"]), id="counter-value"))
+
+
+def render_counter_widget():
+    """Counter card body: minus button, current value, plus button."""
+    return html.div(
+        html.button(
+            "−",
+            hx_post="/counter/dec",
+            hx_target="#counter-value",
+            hx_swap="outerHTML",
+        ),
+        html.span(str(STATE["counter"]), id="counter-value"),
+        html.button(
+            "+",
+            hx_post="/counter/inc",
+            hx_target="#counter-value",
+            hx_swap="outerHTML",
+        ),
+        classes=["counter"],
+    )
+
+
+def render_greet_form():
+    """Form card body: input + submit + result container."""
+    return Fragment(
+        html.form(
+            html.input(
+                type="text",
+                name="name",
+                placeholder="Your name",
+                required=True,
+                autocomplete="off",
+            ),
+            html.button("Greet", type="submit"),
+            hx_post="/greet",
+            hx_target="#greet-result",
+            hx_swap="innerHTML",
+        ),
+        html.div(id="greet-result", classes=["value"]),
+    )
 
 
 def render_index() -> str:
@@ -94,8 +228,14 @@ def render_index() -> str:
         head_elements=(
             html.meta(charset="utf-8"),
             html.meta(name="viewport", content="width=device-width, initial-scale=1"),
+            html.meta(http_equiv="Content-Security-Policy", content=CSP),
+            html.meta(name="htmx-config", content=json.dumps(HTMX_CONFIG)),
             html.title("tagz + htmx demo"),
-            html.script(src="https://unpkg.com/htmx.org@2.0.3"),
+            html.script(
+                src=HTMX_URL,
+                integrity=HTMX_SRI,
+                crossorigin="anonymous",
+            ),
             html.style(STYLES),
         ),
         body_element=html.body(
@@ -106,8 +246,8 @@ def render_index() -> str:
                 classes=["lede"],
             ),
             html.div(
-                html.div(
-                    html.h2("Server time (UTC)"),
+                card(
+                    "Server time (UTC)",
                     html.div(
                         "loading…",
                         hx_get="/now",
@@ -115,10 +255,9 @@ def render_index() -> str:
                         hx_swap="innerHTML",
                         classes=["value"],
                     ),
-                    classes=["card"],
                 ),
-                html.div(
-                    html.h2("Your IP"),
+                card(
+                    "Your IP",
                     html.div(
                         "loading…",
                         id="ip-value",
@@ -127,16 +266,15 @@ def render_index() -> str:
                         hx_swap="innerHTML",
                         classes=["value"],
                     ),
-                    html.button(
+                    footer=html.button(
                         "Refresh",
                         hx_get="/ip",
                         hx_target="#ip-value",
                         hx_swap="innerHTML",
                     ),
-                    classes=["card"],
                 ),
-                html.div(
-                    html.h2("tagz on PyPI"),
+                card(
+                    "tagz on PyPI",
                     html.div(
                         "loading…",
                         id="pypi-value",
@@ -144,13 +282,17 @@ def render_index() -> str:
                         hx_trigger="load",
                         hx_swap="innerHTML",
                     ),
-                    html.button(
+                    footer=html.button(
                         "Refresh",
                         hx_get="/pypi",
                         hx_target="#pypi-value",
                         hx_swap="innerHTML",
                     ),
-                    classes=["card"],
+                ),
+                card("Say hi", render_greet_form()),
+                card(
+                    "Counter (server-side state)",
+                    render_counter_widget(),
                 ),
                 classes=["grid"],
             ),
@@ -216,20 +358,42 @@ async def render_pypi(session: aiohttp.ClientSession) -> str:
 
 
 async def index_handler(request: web.Request) -> web.Response:
-    return web.Response(text=render_index(), content_type="text/html")
+    return html_response(render_index())
 
 
 async def now_handler(request: web.Request) -> web.Response:
-    return web.Response(text=render_now(), content_type="text/html")
+    return html_response(render_now())
 
 
 async def ip_handler(request: web.Request) -> web.Response:
-    return web.Response(text=render_ip(request), content_type="text/html")
+    return html_response(render_ip(request))
 
 
 async def pypi_handler(request: web.Request) -> web.Response:
     session: aiohttp.ClientSession = request.app["http"]
-    return web.Response(text=await render_pypi(session), content_type="text/html")
+    return html_response(await render_pypi(session))
+
+
+async def greet_handler(request: web.Request) -> web.Response:
+    """POST /greet — read the form, return the HTML to slot into #greet-result."""
+    form = await request.post()
+    raw = form.get("name")
+    name = str(raw).strip() if isinstance(raw, str) else ""
+    if not name:
+        body = html.span("Please enter a name.")
+    else:
+        body = html.p(f"Hello, {name}!")
+    return html_response(str(body))
+
+
+async def counter_inc_handler(request: web.Request) -> web.Response:
+    STATE["counter"] += 1
+    return html_response(render_counter_value())
+
+
+async def counter_dec_handler(request: web.Request) -> web.Response:
+    STATE["counter"] -= 1
+    return html_response(render_counter_value())
 
 
 async def on_startup(app: web.Application) -> None:
@@ -246,6 +410,9 @@ def make_app() -> web.Application:
     app.router.add_get("/now", now_handler)
     app.router.add_get("/ip", ip_handler)
     app.router.add_get("/pypi", pypi_handler)
+    app.router.add_post("/greet", greet_handler)
+    app.router.add_post("/counter/inc", counter_inc_handler)
+    app.router.add_post("/counter/dec", counter_dec_handler)
     app.on_startup.append(on_startup)
     app.on_cleanup.append(on_cleanup)
     return app
