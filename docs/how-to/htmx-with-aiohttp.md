@@ -380,23 +380,99 @@ nonces or external stylesheets. For inline `<script>` blocks (which
 you mostly don't need with htmx) use `nonce='...'` and add the same
 nonce to the CSP.
 
-### htmx-specific knobs
+### Pin htmx with Subresource Integrity
 
-- `htmx.config.allowEval = false` — disables the few htmx features
-  that `eval()` strings (mostly `hx-on:*` legacy syntax). Default in
-  recent versions.
-- Use `hx-headers='{"X-CSRF-Token":"..."}'` (or a `<meta name="htmx-config">`
-  block with `"globalHeaders"`) to pin a CSRF token onto every htmx
-  request. Validate it server-side.
-- htmx will execute `<script>` tags that arrive in swapped HTML. If
-  your fragments ever come from untrusted sources, sanitise them
-  upstream — `tagz`'s default escape stops *strings* from forming
-  markup, but it does not prevent you from intentionally rendering a
-  `<script>` tag yourself.
+Loading htmx from a CDN means trusting that CDN to never serve a
+different file. Add `integrity` + `crossorigin` so the browser
+verifies the script hash and refuses to run anything else.
+
+<!-- name: test_htmx_sri -->
+```python
+from tagz import html
+
+HTMX_URL = "https://unpkg.com/htmx.org@2.0.3/dist/htmx.min.js"
+# Pin the exact sha384 of htmx.min.js. Recompute on version bump:
+#   curl -sL "$HTMX_URL" | openssl dgst -sha384 -binary | openssl base64 -A
+HTMX_SRI = "sha384-0895/pl2MU10Hqc6jd4RvrthNlDiE9U1tWmX7WRESftEDRosgxNsQG/Ze9YMRzHq"
+
+
+def htmx_script_tag():
+    return html.script(
+        src=HTMX_URL,
+        integrity=HTMX_SRI,
+        crossorigin="anonymous",
+    )
+
+
+out = str(htmx_script_tag())
+assert 'integrity="sha384-' in out
+assert 'crossorigin="anonymous"' in out
+```
+
+`crossorigin="anonymous"` is required for SRI to take effect when
+the script is served from another origin — without it the browser
+won't expose the response to the integrity check and the script
+fails to load. When you bump the htmx version, recompute the hash —
+stale SRI breaks the page instantly, which is exactly what you
+want.
+
+### Lock down htmx's runtime config
+
+htmx reads a JSON config from `<meta name="htmx-config">` (or via
+`htmx.config.<key> = ...` in JS). The flags below tighten the
+defaults.
+
+<!-- name: test_htmx_config_meta -->
+```python
+import json
+from tagz import html
+
+
+HTMX_CONFIG = {
+    # Only allow htmx to send requests back to the page's origin.
+    # Cross-origin hx-get/hx-post are blocked.
+    "selfRequestsOnly": True,
+    # Refuse to evaluate hx-on:* string handlers. Default since 1.9.x;
+    # be explicit anyway.
+    "allowEval": False,
+    # Don't auto-execute <script> tags arriving in swapped HTML. If a
+    # fragment slips through with one, it sits there inert.
+    "allowScriptTags": False,
+    # Don't cache rendered HTML in localStorage; useful when fragments
+    # may contain sensitive data.
+    "historyEnabled": False,
+}
+
+
+def htmx_config_meta():
+    return html.meta(name="htmx-config", content=json.dumps(HTMX_CONFIG))
+
+
+out = str(htmx_config_meta())
+# Double-quote entities are just the HTML-escape of the JSON's "
+# (the browser decodes before passing the value to htmx).
+assert "&quot;selfRequestsOnly&quot;: true" in out
+assert "&quot;allowEval&quot;: false" in out
+assert "&quot;allowScriptTags&quot;: false" in out
+```
+
+### htmx-specific knobs (quick reference)
+
+- **`selfRequestsOnly: true`** — block cross-origin requests.
+- **`allowEval: false`** — refuse to evaluate `hx-on:*` strings.
+- **`allowScriptTags: false`** — don't run `<script>` tags swapped
+  into the page. The default is `true`, which is the historical
+  source of "I sanitised the data but htmx ran it anyway" bugs.
+- **`hx-headers='{"X-CSRF-Token":"..."}'`** (per element) or
+  `"globalHeaders"` in the config — pin a CSRF token onto every
+  htmx request. Validate it server-side.
+- **`hx-disable`** on a subtree — tell htmx to ignore everything
+  inside. Useful when rendering user-controlled markup that lives
+  inside a wrapper your own sanitiser owns.
 
 The takeaway: tagz makes the **default** path safe (escape + typed
-attributes). CSP + sniff-off + CSRF are the perimeter you draw
-around the response.
+attributes). SRI + CSP + the htmx-config lockdown + CSRF are the
+perimeter you draw around the response.
 
 ## Want a bigger example?
 

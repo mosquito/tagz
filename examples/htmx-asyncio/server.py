@@ -14,6 +14,7 @@ Then open http://127.0.0.1:8080/.
 
 from __future__ import annotations
 
+import json
 from datetime import datetime, timezone
 
 import aiohttp
@@ -23,6 +24,22 @@ from tagz import Fragment, Page, Style, StyleSheet, html
 
 
 PYPI_URL = "https://pypi.org/pypi/tagz/json"
+
+# Pin htmx to an exact version and its SRI hash. The browser verifies
+# the script bytes against the hash; any tampering and the script
+# refuses to load. Recompute on version bump:
+#   curl -sL "$HTMX_URL" | openssl dgst -sha384 -binary | openssl base64 -A
+HTMX_URL = "https://unpkg.com/htmx.org@2.0.3/dist/htmx.min.js"
+HTMX_SRI = "sha384-0895/pl2MU10Hqc6jd4RvrthNlDiE9U1tWmX7WRESftEDRosgxNsQG/Ze9YMRzHq"
+
+# Runtime config for htmx — read from the <meta name="htmx-config">
+# tag in the page head. Tightens the defaults:
+HTMX_CONFIG = {
+    "selfRequestsOnly": True,    # block cross-origin hx-* requests
+    "allowEval": False,          # refuse hx-on:* string handlers
+    "allowScriptTags": False,    # don't execute <script> in swapped HTML
+    "historyEnabled": False,     # don't cache fragments in localStorage
+}
 
 # Server-side state shared across all clients. In a real app this would
 # live in a database or per-session store — the rendering code below
@@ -212,8 +229,13 @@ def render_index() -> str:
             html.meta(charset="utf-8"),
             html.meta(name="viewport", content="width=device-width, initial-scale=1"),
             html.meta(http_equiv="Content-Security-Policy", content=CSP),
+            html.meta(name="htmx-config", content=json.dumps(HTMX_CONFIG)),
             html.title("tagz + htmx demo"),
-            html.script(src="https://unpkg.com/htmx.org@2.0.3"),
+            html.script(
+                src=HTMX_URL,
+                integrity=HTMX_SRI,
+                crossorigin="anonymous",
+            ),
             html.style(STYLES),
         ),
         body_element=html.body(

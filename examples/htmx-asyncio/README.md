@@ -62,6 +62,13 @@ Open <http://127.0.0.1:8080/>.
   for scripts and forbids framing. The same CSP is also emitted as
   a `<meta http-equiv>` in case the page is served somewhere that
   strips headers.
+- **htmx pinning & lockdown.** The htmx `<script>` is loaded with
+  `integrity="sha384-..."` and `crossorigin="anonymous"` — SRI stops
+  a tampered CDN response from running. A `<meta name="htmx-config">`
+  in the head sets `selfRequestsOnly: true`, `allowEval: false`,
+  `allowScriptTags: false`, and `historyEnabled: false`, so
+  cross-origin requests, `hx-on:*` eval, and stray `<script>` tags
+  in swapped HTML are all blocked.
 
 ## Files
 
