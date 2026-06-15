@@ -509,10 +509,16 @@ class HTML:
         tag_name = tag_name.lower().replace("_", "-")
         return create_tag_class(tag_name, **self.__defaults.get(tag_name, {}))
 
-    @lru_cache(maxsize=None)
     def __getattr__(self, tag_name: str) -> Type[TagInstance]:
-        """Attribute-access shorthand for :meth:`__getitem__`."""
-        return self[tag_name.replace("_", "-")]
+        """Attribute-access shorthand for :meth:`__getitem__`.
+
+        The resolved class is memoised on the instance — subsequent
+        ``html.<tag>`` lookups bypass ``__getattr__`` entirely via
+        normal attribute resolution.
+        """
+        cls = self[tag_name.replace("_", "-")]
+        self.__dict__[tag_name] = cls
+        return cls
 
 
 class Fragment(Tag):
