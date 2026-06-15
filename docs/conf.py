@@ -30,7 +30,6 @@ myst_heading_anchors = 3
 
 html_theme = "furo"
 html_title = "tagz"
-html_static_path = ["_static"]
 html_theme_options = {
     "source_repository": "https://github.com/mosquito/tagz",
     "source_branch": "master",
