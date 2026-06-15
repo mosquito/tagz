@@ -9,28 +9,22 @@
 
 A lightweight, type-safe Python library for building and parsing HTML documents programmatically without templates.
 
+> 📚 **Full documentation:** <https://mosquito.github.io/tagz/>
+
 ## Overview
 
-`tagz` lets you construct HTML using pure Python code with a clean, intuitive API. No template engines, no DSLs—just Python functions and objects that map directly to HTML elements.
+`tagz` lets you construct HTML using pure Python code with a clean, intuitive API. No template engines, no DSLs — just Python functions and objects that map directly to HTML elements.
 
 **Key Features:**
 
-- **Programmatic HTML Construction** - Build HTML documents using Python objects and methods
-- **HTML Parser** - Parse existing HTML strings back into manipulable Tag objects
-- **Type-Safe** - Full mypy support with comprehensive type annotations
-- **Streaming Support** - Memory-efficient rendering with `iter_lines()`, `iter_chunk()`, and `iter_string()`
-- **Automatic Escaping** - XSS protection enabled by default with HTML entity escaping
-- **Performance Optimized** - LRU caching and zero-copy optimizations for speed
-- **CSS Helpers** - Built-in `Style` and `StyleSheet` objects for inline and embedded styles
-- **Fragment Support** - Group elements without wrapper tags (like React Fragments)
-- **Page Objects** - High-level API for complete HTML documents with DOCTYPE support
-
-**Perfect for:**
-- Generating HTML emails and reports
-- Building web UIs without JavaScript frameworks
-- Creating dynamic documentation
-- Programmatic HTML manipulation and transformation
-- Server-side rendering in Python web applications
+- **Programmatic HTML construction** — build documents using Python objects and methods
+- **HTML parser** — parse existing HTML strings back into manipulable `Tag` objects
+- **Type-safe** — full mypy support with comprehensive type annotations
+- **Streaming support** — memory-efficient rendering with `iter_lines()`, `iter_chunk()`, and `iter_string()`
+- **Automatic escaping** — XSS protection enabled by default
+- **CSS helpers** — built-in `Style` and `StyleSheet` objects
+- **Fragments and raw** — group elements without wrapper tags, or splice in pre-rendered HTML
+- **Page objects** — high-level API for complete HTML documents with DOCTYPE support
 
 ## Installation
 
@@ -38,9 +32,17 @@ A lightweight, type-safe Python library for building and parsing HTML documents 
 pip install tagz
 ```
 
-## Quick Start
+or with [uv](https://docs.astral.sh/uv/):
 
-<!-- name: test_page_render -->
+```bash
+uv add tagz
+```
+
+Requires Python 3.10+.
+
+## Quick start
+
+<!-- name: test_readme_quick_start -->
 ```python
 from tagz import Page, StyleSheet, Style, html
 
@@ -73,11 +75,13 @@ page = Page(
     ),
 )
 
-# `pretty=False` should be faster but performs not a human-readable result
-print(page.to_html5(pretty=True))
+# `pretty=False` is the fast path; pretty=True produces human-readable output.
+output = page.to_html5(pretty=True)
+assert output.startswith("<!doctype html>")
+assert "<strong>" in output
 ```
 
-writes something like this:
+The pretty-printed output looks like:
 
 ```html
 <!doctype html>
@@ -115,676 +119,31 @@ writes something like this:
 </html>
 ```
 
-# Features
-
-`tagz` provides the following features:
-
-## Callable children and attributes
-
-You can pass a function (callable) as a child or as an attribute value to any tag. This allows for lazy or dynamic content generation.
-
-### Callable children
-
-<!-- name: test_callable_child -->
-```python
-from tagz import html
-
-def child():
-    return "hello"
-
-tag = html.div(child)
-assert str(tag) == "<div>hello</div>"
-```
-
-Or return another tag:
-
-<!-- name: test_callable_child -->
-```python
-from tagz import html
-
-# Callable child returning a tag
-def child_tag():
-    return html.span("world")
-
-tag = html.div(child_tag)
-assert str(tag) == "<div><span>world</span></div>"
-```
-
-You can also use `append` with callables:
-
-<!-- name: test_callable_append -->
-```python
-from tagz import html
-
-tag = html.div()
-tag.append(lambda: "foo")
-assert str(tag) == "<div>foo</div>"
-```
-
-### Callable attribute values
-
-You can use callables as attribute values. If the result is a not an string, it will be converted to string and escaped as an attribute value.
-
-<!-- name: test_callable_attrs -->
-```python
-from tagz import html
-
-def attr():
-    return "bar"
-
-tag = html.div(foo=attr)
-assert str(tag) == '<div foo="bar"></div>', str(tag)
-```
-
-## Custom tags is supported
-
-Add custom tags by using underscore `_` in the name:
-
-<!-- name: test_custom_tag -->
-```python
-from tagz import html
-assert str(html.my_custom_tag("hello")) == "<my-custom-tag>hello</my-custom-tag>" 
-```
-
-## Pretty printing html
-
-You can pretty print the html output with `to_string(pretty=True)` or `to_html5(pretty=True)` methods:
-
-<!-- name: test_pretty_printing -->
-```python
-from tagz import html
-
-result = html.div(
-    "Hello", html.strong("world"),
-).to_string(pretty=True)
-
-assert result == "<div>\n\tHello\n\t<strong>\n\t\tworld\n\t</strong>\n</div>\n"
-```
-
-## Iterating string generation
-
-For memory-efficient or streaming scenarios, `tagz` provides three methods for incremental HTML generation:
-
-### `iter_lines()` - Line-by-line iteration (recommended)
-
-The `iter_lines()` method yields complete lines of pretty-printed HTML, making it ideal for streaming to files or network sockets:
-
-<!-- name: test_iter_lines_basic -->
-```python
-from tagz import html
-
-tag = html.div(
-    html.p("First paragraph"),
-    html.p("Second paragraph"),
-)
-
-# Iterate line by line (always pretty-printed)
-lines = list(tag.iter_lines())
-assert lines == [
-    "<div>",
-    "\t<p>",
-    "\t\tFirst paragraph",
-    "\t</p>",
-    "\t<p>",
-    "\t\tSecond paragraph",
-    "\t</p>",
-    "</div>",
-]
-```
-
-You can customize the indentation character:
-
-<!-- name: test_iter_lines_indent -->
-```python
-from tagz import html
-
-tag = html.div(html.p("Hello"))
-
-# Customize indentation (default is tab)
-lines = list(tag.iter_lines(indent_char="  "))
-assert lines == [
-    "<div>",
-    "  <p>",
-    "    Hello",
-    "  </p>",
-    "</div>",
-]
-```
-
-Stream to a file:
-
-<!-- name: test_iter_lines_file -->
-```python
-from tagz import html
-from tempfile import NamedTemporaryFile
-
-tag = html.div(html.p("Content"))
-
-# Stream to a file
-with NamedTemporaryFile(mode="w", suffix=".html", delete=True) as f:
-    for line in tag.iter_lines():
-        f.write(line + "\n")
-    f.flush()
-```
-
-### `iter_chunk()` - Fixed-size chunk iteration
-
-The `iter_chunk()` method yields HTML in fixed-size chunks, perfect for network transmission or buffered I/O:
-
-<!-- name: test_iter_chunk_basic -->
-```python
-from tagz import html
-
-tag = html.div(
-    html.p("First paragraph with some content"),
-    html.p("Second paragraph with more content"),
-)
-
-# Generate HTML in 50-byte chunks
-chunks = list(tag.iter_chunk(chunk_size=50))
-
-# Each chunk is approximately 50 bytes (except possibly the last one)
-assert all(len(chunk) <= 50 or chunk == chunks[-1] for chunk in chunks)
-
-# Verify reconstruction
-assert "".join(chunks) == tag.to_string()
-```
-
-You can use it with pretty printing and custom indentation:
-
-<!-- name: test_iter_chunk_pretty -->
-```python
-from tagz import html
-from functools import partial
-
-content = "Paragraph {}"
-# Create a large tag with many lazy evaluated children
-tag = html.div(*[html.p(partial(content.format, i)) for i in range(1000)])
-
-# Pretty-printed chunks with custom indent
-chunks = list(tag.iter_chunk(chunk_size=1024, pretty=True, indent_char="  "))
-
-# Verify reconstruction works correctly
-assert "".join(chunks) == tag.to_string(pretty=True).replace("\t", "  ")
-```
-
-### `iter_string()` - Fragment-by-fragment iteration
-
-The `iter_string()` method yields tiny fragments of HTML as they are generated, useful for very fine-grained control:
-
-<!-- name: test_iter_string -->
-```python
-from tagz import html
-
-tag = html.div(html.p("Hello"))
-
-# Generate HTML in small fragments (non-pretty)
-result = "".join(tag.iter_string())
-assert result == "<div><p>Hello</p></div>"
-
-# Also works with pretty printing
-pretty_result = "".join(tag.iter_string(pretty=True))
-assert pretty_result == "<div>\n\t<p>\n\t\tHello\n\t</p>\n</div>\n"
-```
-
-All these methods are useful when generating large HTML documents where you want to stream the output without building the entire string in memory.
-
-## Parsing HTML
-
-The `parse()` function converts HTML strings back into Tag objects, allowing you to manipulate existing HTML programmatically.
-
-### Basic Parsing
-
-<!-- name: test_parse_basic -->
-```python
-from tagz import parse
-
-# Parse a simple HTML string
-tag = parse("<div><p>Hello</p></div>")
-assert tag.name == "div"
-assert len(tag.children) == 1
-assert str(tag) == "<div><p>Hello</p></div>"
-```
-
-### Parsing with Attributes and Classes
-
-<!-- name: test_parse_attributes -->
-```python
-from tagz import parse
-
-# Attributes and classes are preserved
-tag = parse('<div id="main" class="container primary">Content</div>')
-assert tag["id"] == "main"
-assert "container" in tag.classes
-assert "primary" in tag.classes
-
-# Modify the parsed tag
-tag["data-value"] = "test"
-tag.classes.add("active")
-```
-
-### Multiple Root Elements
-
-<!-- name: test_parse_fragment -->
-```python
-from tagz import parse, Fragment
-
-# Multiple root elements return a Fragment
-result = parse("<p>First</p><p>Second</p>")
-assert isinstance(result, Fragment)
-assert str(result) == "<p>First</p><p>Second</p>"
-```
-
-### Practical Example: Modifying Existing HTML
-
-<!-- name: test_parse_modify -->
-```python
-from tagz import parse, html
-
-# Parse existing HTML
-original = "<div><h1>Old Title</h1><p>Content</p></div>"
-tag = parse(original)
-
-# Modify the structure
-tag.children[0] = html.h1("New Title")
-tag.append(html.footer("Footer content"))
-
-# Generate modified HTML
-modified = str(tag)
-assert "New Title" in modified
-assert "Footer content" in modified
-```
-
-### Parsing Full HTML Documents
-
-When parsing a complete HTML document with an `<html>` tag, the parser automatically returns a `Page` object:
-
-<!-- name: test_parse_page -->
-```python
-from tagz import parse, Page
-
-# Parse a complete HTML document
-html_doc = """<!DOCTYPE html>
-<html lang="en">
-<head>
-    <title>My Page</title>
-    <meta charset="utf-8"/>
-</head>
-<body>
-    <h1>Welcome</h1>
-    <p>Content here</p>
-</body>
-</html>"""
-
-result = parse(html_doc)
-assert isinstance(result, Page)
-
-# Access page components
-assert result.body is not None
-assert "Welcome" in str(result.body)
-assert result.head is not None
-assert "My Page" in str(result.head)
-
-# DOCTYPE is preserved
-full_html = result.to_html5()
-assert full_html.startswith("<!DOCTYPE html>")
-```
-
-The parser automatically:
-- Decodes HTML entities (e.g., `&lt;` becomes `<`)
-- Handles void elements (`<br/>`, `<img/>`, etc.)
-- Preserves boolean attributes (e.g., `checked`, `disabled`)
-- Respects script/style tag behavior (unescaped content)
-- Returns `Page` objects for complete HTML documents with `<html>` tag
-- Preserves DOCTYPE declarations (HTML5, HTML4, XHTML, etc.)
-
-## `Style` and `StyleSheet` helper objects
-
-`Style` helper object encapsulating css styles:
-
-<!-- name: test_custom_tag -->
-```python
-from tagz import Style
-assert str(Style(color="#ffffff")) == "color: #ffffff;"
-```
-
-
-`StyleSheet` helper object encapsulating css stylesheet:
-
-<!-- name: test_stylesheet -->
-```python
-from tagz import Style, StyleSheet
-
-# body {padding: 0;margin: 0}
-# a, div {transition: opacity 600ms ease-in}
-print(
-    str(
-        StyleSheet({
-            "body": Style(padding="0", margin="0"),
-            ("div", "a"): Style(transition="opacity 600ms ease-in"),
-        })
-    )
-)
-```
-
-## Controlling Attribute Absence
-
-You can use the special value `ABSENT` to dynamically remove an attribute from a tag. This is useful for callables that may want to omit an attribute based on logic.
-
-<!-- name: test_absent_attr -->
-```python
-from tagz import html, ABSENT
-
-present = True
-
-def attr():
-     return "value" if present else ABSENT
-
-tag = html.div(test=attr)
-assert str(tag) == '<div test="value"></div>'
-
-present = False
-assert str(tag) == "<div></div>"
-```
-
-## Raw Content in Script and Style
-
-Content inside `<script>` and `<style>` tags is not escaped by default. This allows you to embed raw JS/CSS.
-
-<!-- name: test_raw_script_style -->
-```python
-from tagz import html
-
-style = html.style("body {margin: 0; padding: 0;}")
-assert str(style) == "<style>body {margin: 0; padding: 0;}</style>"
-
-script = html.script('''console.log(1 > 2 && 3 < 2 && "0" === '0');''')
-assert str(script) == '''<script>console.log(1 > 2 && 3 < 2 && "0" === '0');</script>'''
-```
-
-## Fragment - Grouping Without Wrappers
-
-Use the `Fragment` class to group multiple elements without adding a wrapper tag. This is similar to React's Fragment and is useful when you need to return multiple elements but don't want to add an extra `<div>` or other container:
-
-<!-- name: test_fragment_basic -->
-```python
-from tagz import html, Fragment
-
-# Fragment groups children without adding wrapper tags
-fragment = Fragment(
-    html.h1("Title"),
-    html.p("First paragraph"),
-    html.p("Second paragraph"),
-)
-
-assert str(fragment) == "<h1>Title</h1><p>First paragraph</p><p>Second paragraph</p>"
-```
-
-Fragments are especially useful when returning multiple elements from functions or conditionals:
-
-<!-- name: test_fragment_function -->
-```python
-from tagz import html, Fragment
-
-def render_header(show_subtitle=True):
-    if show_subtitle:
-        return Fragment(
-            html.h1("Main Title"),
-            html.h2("Subtitle"),
-        )
-    return html.h1("Main Title")
-
-# With subtitle - returns multiple elements without wrapper
-header_with_subtitle = render_header(True)
-assert str(header_with_subtitle) == "<h1>Main Title</h1><h2>Subtitle</h2>"
-
-# Without subtitle - returns single element
-header_simple = render_header(False)
-assert str(header_simple) == "<h1>Main Title</h1>"
-```
-
-Fragments can be used as children of other tags:
-
-<!-- name: test_fragment_nested -->
-```python
-from tagz import html, Fragment
-
-container = html.div(
-    html.header("Header"),
-    Fragment(
-        html.p("Paragraph 1"),
-        html.p("Paragraph 2"),
-    ),
-    html.footer("Footer"),
-)
-
-expected = (
-    "<div>"
-    "<header>Header</header>"
-    "<p>Paragraph 1</p><p>Paragraph 2</p>"
-    "<footer>Footer</footer>"
-    "</div>"
-)
-assert str(container) == expected
-```
-
-**Note:** Fragments maintain the escaping behavior of their children but render them without indentation in pretty mode to maintain transparency.
-
-## Raw HTML Content
-
-Use the `Raw` class to embed completely unescaped HTML content. This is useful when you have pre-rendered HTML fragments or need to bypass all escaping:
-
-<!-- name: test_raw_html -->
-```python
-from tagz import html, Raw
-
-# Create raw HTML content (not escaped, no wrapper tags)
-raw = Raw("<div>raw content & more</div>")
-assert str(raw) == "<div>raw content & more</div>"
-
-# Can be used as a child of other tags
-container = html.div(raw)
-assert str(container) == "<div><div>raw content & more</div></div>"
-
-# Raw content is never indented in pretty mode
-assert raw.to_string(pretty=True) == "<div>raw content & more</div>"
-```
-
-**Warning:** `Raw` is completely unescaped and unsafe against XSS attacks. Only use it with trusted content or when you have already sanitized the HTML.
-
-## Tag classes API
-
-The `classes` property supports assignment via set, list, tuple, or space-separated string, and raises a `TypeError` for invalid types.
-
-<!-- name: test_classes_setter -->
-```python
-from tagz import html
-
-tag = html.div()
-tag.classes = "foo bar"
-assert tag.classes == {"foo", "bar"}
-tag.classes = ["baz"]
-assert tag.classes == {"baz"}
-```
-
-You can use either `class` or `classes` as a keyword argument or attribute key. Both will be mapped to the HTML `class` attribute and the internal `classes` set. This allows for more natural Python code:
-
-<!-- name: test_class_attribute -->
-```python
-from tagz import html
-
-tag = html.div(classes=["foo", "bar"])
-# Classes are stored as a set internally
-assert str(tag) == '<div class="bar foo"></div>', str(tag)
-
-tag["class"] = "baz"
-assert str(tag) == '<div class="baz"></div>', str(tag)
-
-tag["classes"] = "spam eggs"
-# Classes was splitted and are stored as a set internally
-assert str(tag) == '<div class="eggs spam"></div>', str(tag)
-```
-
-## Escaping Callable Children
-
-If a callable child returns a string, it will be escaped by default (unless the tag disables escaping, e.g., `<script>` or `<style>`):
-
-<!-- name: test_escaped_callable_child -->
-```python
-from tagz import html
-
-def child():
-    return "<script>alert('xss');</script>"
-
-tag = html.div(child)
-assert str(tag) == "<div>&lt;script&gt;alert(&#x27;xss&#x27;);&lt;/script&gt;</div>"
-```
-
-## Boolean Attribute Handling
-
-Setting an attribute to `True` renders it as a boolean attribute (e.g., `<input checked>`). Setting it to `False` removes the attribute:
-
-<!-- name: test_boolean_attribute -->
-```python
-from tagz import html
-
-tag = html.input(type="checkbox", checked=True)
-assert str(tag) == '<input checked type="checkbox"/>'
-tag["checked"] = False
-assert str(tag) == '<input type="checkbox"/>'
-```
-
-## Data URI helpers
-
-You can embed binary data directly in HTML attributes using `data_uri` and `open_data_uri`:
-
-<!-- name: test_data_uri -->
-```python
-from tagz import data_uri
-
-src = data_uri(b"hello world", media_type="text/plain")
-assert src == "data:text/plain;base64,aGVsbG8gd29ybGQ="
-```
-
-Or use `open_data_uri` to read and encode a file directly:
-
-<!-- name: test_open_data_uri -->
-```python
-from tempfile import NamedTemporaryFile
-from tagz import open_data_uri, html
-
-with NamedTemporaryFile("wb", suffix=".png") as f:
-    # Write a minimal PNG file
-    f.write(b"\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00\x01"
-            b"\x00\x00\x00\x01\x08\x06\x00\x00\x00\x1f\x15\xc4"
-            b"\x89\x00\x00\x00\nIDATx\xdac\xf8\x0f\x00\x01\x01"
-            b"\x01\x00\x18\xdd\x03\xe2\x00\x00\x00\x00IEND\xaeB`\x82")
-    f.flush()
-    f.seek(0)
-
-    src = open_data_uri(f.name, media_type="image/png")
-    img_tag = html.img(src=src, alt="Nothing")
-    assert str(img_tag).startswith(
-        '<img alt="Nothing" src="data:image/png;base64,'
-        'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcS'
-        'JAAAACklEQVR42mP4DwABAQEAGN0D4gAAAABJRU5ErkJggg=='
-    )
-```
-
-# More examples
-
-## Building page from parts
-
-You can reuse the code, and assemble the page piece by piece, 
-to do this you can modify elements already added to the tags:
-
-```python
-from tagz import html, Page
-
-# Make an content element
-content = html.div(id='content')
-
-page = Page(
-    lang="en",
-    body_element=html.body(
-        html.h1("Example page"),
-        html.hr(),
-        # Adding it to the page
-        content,
-    ),
-    head_elements=(
-        html.meta(charset="utf-8"),
-        html.title("tagz partial page"),
-    ),
-)
-
-content.append("Example page content")
-
-print(page.to_html5(pretty=True))
-```
-
-This prints something like this:  
-
-```html
-<!doctype html>
-<html lang="en">
-	<head>
-		<meta charset="utf-8"/>
-		<title>
-			tagz example page
-		</title>
-	</head>
-	<body>
-		<h1>
-			Example page
-		</h1>
-		<hr/>
-		<div id="content">
-			Example page content
-		</div>
-	</body>
-</html>
-```
-
-## Convert CSV to html table
-
-```python
-from io import StringIO
-from urllib.request import urlopen
-from csv import reader
-from tagz import html, Page, Style
-
-url = (
-    'https://media.githubusercontent.com/media/datablist/'
-    'sample-csv-files/main/files/organizations/'
-    'organizations-10000.csv'
-)
-
-csv = reader(StringIO(urlopen(url).read().decode()))
-table = html.table(border='1', style=Style(border_collapse="collapse"))
-content = list(csv)
-
-# Make table header 
-table.append(html.tr(*map(html.th, content[0])))
-
-# Add table rows
-for csv_row in content[1:]:
-    table.append(html.tr(*map(html.td, csv_row)))
-
-page = Page(
-    lang="en",
-    body_element=html.body(
-        html.h1("Converted CSV"),
-        table,
-        "Content of this page has been automatically converted from",
-        html.a(url, href=url),
-    ),
-    head_elements=(
-        html.meta(charset="utf-8"),
-        html.title("tagz csv example page"),
-    ),
-)
-
-with open("/tmp/csv.html", "w") as fp:
-    fp.write(page.to_html5())
-```
+## Where to next?
+
+The full documentation is organised in the [Diátaxis](https://diataxis.fr/) style:
+
+- **[Tutorials](https://mosquito.github.io/tagz/tutorials/)** — guided lessons that take you from zero to a working page, parser, or streamed document.
+- **[How-to guides](https://mosquito.github.io/tagz/how-to/)** — recipe-style answers to specific problems (streaming, callables, async data, `data:` URIs, CSV → table, …).
+- **[Reference](https://mosquito.github.io/tagz/reference/)** — the full API surface with type signatures.
+- **[Explanation](https://mosquito.github.io/tagz/explanation/)** — design rationale: escaping model, callables and laziness, why there's no async render path.
+
+## Feature highlights
+
+| Feature | Read more |
+| ------- | --------- |
+| Callable children & attributes | [How-to: lazy children](https://mosquito.github.io/tagz/how-to/lazy-children-with-callables.html) |
+| Conditional attributes via `ABSENT` | [How-to: conditional attributes](https://mosquito.github.io/tagz/how-to/conditional-attributes-with-absent.html) |
+| Boolean attributes (`checked`, `disabled`, …) | [How-to: boolean attributes](https://mosquito.github.io/tagz/how-to/boolean-attributes.html) |
+| Custom / non-standard tag names | [How-to: custom tags](https://mosquito.github.io/tagz/how-to/custom-tags.html) |
+| Fragments and unescaped `Raw` content | [How-to: fragments vs raw](https://mosquito.github.io/tagz/how-to/fragments-vs-raw.html) |
+| Inline `style=` and `<style>` blocks | [How-to: inline & embedded CSS](https://mosquito.github.io/tagz/how-to/inline-and-embedded-css.html) |
+| Streaming to file / socket / ASGI | [How-to: stream to a socket](https://mosquito.github.io/tagz/how-to/stream-to-socket.html) |
+| `data:` URIs for inline binary data | [How-to: embed binary data](https://mosquito.github.io/tagz/how-to/embed-binary-with-data-uri.html) |
+| Pre-resolving async data | [How-to: prefetch async data](https://mosquito.github.io/tagz/how-to/prefetch-async-data.html) |
+| Serving HTML fragments to htmx (aiohttp) | [How-to: htmx + aiohttp](https://mosquito.github.io/tagz/how-to/htmx-with-aiohttp.html) — full demo in [`examples/htmx-asyncio`](examples/htmx-asyncio/) |
+| Parsing existing HTML | [Tutorial: parse and modify](https://mosquito.github.io/tagz/tutorials/parsing-and-modifying.html) |
+
+## License
+
+MIT — see [LICENSE](LICENSE).

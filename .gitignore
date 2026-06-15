@@ -81,6 +81,11 @@ instance/
 # Sphinx documentation
 docs/_build/
 docs/source/apidoc
+site/
+
+# Re-include .github (a global ignore rule may hide dotted dirs)
+!.github/
+!.github/**
 
 # PyBuilder
 target/
