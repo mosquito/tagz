@@ -30,6 +30,14 @@ escape = lru_cache(maxsize=512)(escape)
 
 
 class Style(Dict[str, Any]):
+    """A `dict` subclass that stringifies to a CSS declaration block.
+
+    Keys may use Python identifier syntax — underscores are rewritten
+    to hyphens so ``Style(font_size="12px")`` renders as
+    ``font-size: 12px;``. Declarations are emitted sorted by key for
+    deterministic output.
+    """
+
     def __init__(self, *args: Any, **kwargs: Any):
         kwargs = {key.replace("_", "-"): value for key, value in kwargs.items()}
         super().__init__(*args, **kwargs)
@@ -39,6 +47,14 @@ class Style(Dict[str, Any]):
 
 
 class StyleSheet(Dict[Union[str, Tuple[str, ...]], Style]):
+    """A `dict` subclass mapping selectors to :class:`Style` blocks.
+
+    Keys may be a single selector string or a tuple of selectors
+    (rendered as a comma-separated list). Useful inside ``<style>``:
+
+    ``StyleSheet({"body": Style(margin="0"), ("a", "div"): Style(...)})``
+    """
+
     def __str__(self) -> str:
         styles = []
         for key, value in sorted(self.items(), key=str):
@@ -49,10 +65,13 @@ class StyleSheet(Dict[Union[str, Tuple[str, ...]], Style]):
 
 
 class AbsentAttribute:
-    pass
+    """Sentinel type for :data:`ABSENT`. Not intended to be instantiated."""
 
 
 ABSENT = AbsentAttribute()
+"""Sentinel value: when used as an attribute value, removes the
+attribute from the rendered output. Useful from callables that decide
+at render-time whether to emit an attribute at all."""
 
 ChildType = Union["Tag", str, Callable[[], Union["Tag", str]]]
 AttributeType = Union[
@@ -62,6 +81,24 @@ AttributeType = Union[
 
 @dataclass(frozen=False, slots=True)
 class Tag:
+    """An HTML element.
+
+    Holds the tag name, an ordered list of children, an attribute
+    mapping, and a class set. Most users construct tags through the
+    :data:`html` factory (``html.div(...)``) rather than calling
+    ``Tag(...)`` directly.
+
+    Children may be strings, other tags, or zero-argument callables
+    returning strings or tags — callables are invoked on each render.
+    String children are HTML-escaped at append time unless the tag was
+    created with ``_escaped=False`` (see ``<script>``/``<style>``).
+
+    Attributes are passed as keyword arguments. The ``classes``
+    keyword (and the ``class``/``classes`` item access) maps to the
+    HTML ``class`` attribute; underscores in attribute names are
+    rewritten to hyphens (``data_value`` → ``data-value``).
+    """
+
     name: str
     children: List[ChildType]
     attributes: MutableMapping[str, AttributeType]
@@ -96,11 +133,17 @@ class Tag:
 
     @property
     def classes(self) -> AbstractSet[str]:
+        """The element's CSS classes as a set of strings."""
         return self._classes
 
     @classes.setter
     def classes(self, value: Union[Iterable[str], AbstractSet[str], str]) -> None:
-        # Accepts list, set, tuple, or str
+        """Replace the class set.
+
+        Accepts a list/set/tuple of class names, or a space-separated
+        string. Raises :class:`TypeError` for anything else. Class
+        names are HTML-escaped.
+        """
         if isinstance(value, (list, set, tuple)):
             self._classes = set(escape(v, quote=True) for v in value)
             return
@@ -113,6 +156,13 @@ class Tag:
         )
 
     def append(self, other: ChildType) -> None:
+        """Append a child to the element.
+
+        Strings are HTML-escaped unless the tag was created with
+        ``_escaped=False``. Callables are stored as-is and invoked
+        during rendering. Raises :class:`ValueError` for void
+        elements.
+        """
         if self._void:
             raise ValueError("Cannot append children to a void element.")
 
@@ -121,6 +171,13 @@ class Tag:
         return self.children.append(other)
 
     def __setitem__(self, key: str, value: AttributeType) -> None:
+        """Set an attribute by name.
+
+        ``"class"`` and ``"classes"`` are routed to :attr:`classes`.
+        ``True`` becomes a boolean attribute (rendered as the bare
+        name); ``False`` and :data:`ABSENT` remove the attribute.
+        Callable values are stored and invoked at render time.
+        """
         k = escape(key)
 
         if k in ("class", "classes"):
@@ -138,9 +195,11 @@ class Tag:
         self.attributes[k] = value
 
     def __getitem__(self, item: str) -> AttributeType:
+        """Read an attribute by name. Raises :class:`KeyError` if unset."""
         return self.attributes[escape(item)]
 
     def __delitem__(self, key: str) -> None:
+        """Remove an attribute by name."""
         del self.attributes[escape(key)]
 
     def _format_attributes(self) -> str:
@@ -246,6 +305,16 @@ class Tag:
             yield "\n"
 
     def iter_string(self, pretty: bool = False) -> Iterator[str]:
+        """Iterate over the HTML output as small string fragments.
+
+        Yields fine-grained pieces of the rendered HTML in document
+        order. Useful when you want the most control; for streaming
+        prefer :meth:`iter_lines` (line-based) or :meth:`iter_chunk`
+        (size-based).
+
+        Args:
+            pretty: If True, format with indentation and newlines.
+        """
         yield from self._to_string("", "\t" if pretty else "")
 
     def iter_lines(self, indent_char: str = "\t") -> Iterator[str]:
@@ -332,10 +401,25 @@ class Tag:
             yield buffer
 
     def to_string(self, pretty: bool = False) -> str:
+        """Render the element to a complete HTML string.
+
+        Args:
+            pretty: If True, output is indented with one tab per
+                level and lines are broken between siblings.
+        """
         return "".join(self.iter_string(pretty=pretty))
 
 
 class TagInstance(Tag):
+    """Base class for concrete element classes produced by :data:`html`.
+
+    Subclasses are generated dynamically — for example
+    ``html.div`` is a ``TagDiv`` class whose ``__tag_name__`` is
+    ``"div"``. The class attributes ``__void__``, ``__escaped__``,
+    ``__default_children__`` and ``__default_attributes__`` carry
+    per-element defaults.
+    """
+
     __tag_name__: str
     __void__: bool = False
     __escaped__: bool = True
@@ -391,21 +475,38 @@ def create_tag_class(tag_name: str, **defaults: Any) -> Type[TagInstance]:
 
 
 class HTML:
+    """Factory that produces :class:`TagInstance` subclasses per name.
+
+    ``html.div`` and ``html["div"]`` return the same class. The
+    ``defaults`` mapping passed to the constructor is consulted for
+    per-element flags (``__void__``, ``__escaped__``) — see the
+    pre-built :data:`html` object for the standard configuration.
+    """
+
     def __init__(self, defaults: Mapping[str, Mapping[str, Any]]):
         self.__defaults: Mapping[str, Mapping[str, Any]] = MappingProxyType(defaults)
 
     def __getitem__(self, tag_name: str) -> Type[TagInstance]:
+        """Return the :class:`TagInstance` subclass for ``tag_name``.
+
+        The name is lowercased and underscores are mapped to hyphens.
+        Subclasses are cached per name.
+        """
         tag_name = tag_name.lower().replace("_", "-")
         return create_tag_class(tag_name, **self.__defaults.get(tag_name, {}))
 
     def __getattr__(self, tag_name: str) -> Type[TagInstance]:
+        """Attribute-access shorthand for :meth:`__getitem__`."""
         return self[tag_name.replace("_", "-")]
 
 
 class Fragment(Tag):
-    """
-    A Fragment necessary to group children without adding extra tags.
-    Each child maintains its own escaping behavior.
+    """A wrapper-less container that groups children inline.
+
+    Renders the children in order with no surrounding tags — useful
+    when you want to return several elements from a function without
+    introducing an extra ``<div>``. Each child keeps its own escaping
+    behaviour.
     """
 
     def __init__(self, *_children: ChildType, _escaped: bool = True):
@@ -422,10 +523,11 @@ class Fragment(Tag):
 
 
 class Raw(Fragment):
-    """
-    A Tag that renders raw, unwrapped content.
-    It is completely unescaped and really unsafe against XSS.
-    The best practice is to avoid using this unless absolutely necessary.
+    """A wrapper-less container that emits its content verbatim.
+
+    No HTML escaping is performed. Use only with content you trust —
+    anything tainted by user input must be sanitised first or this
+    becomes an XSS vector.
     """
 
     def __init__(self, content: str):
@@ -435,6 +537,9 @@ class Raw(Fragment):
 _void = MappingProxyType({"__void__": True})
 _unescaped = MappingProxyType({"__escaped__": False})
 
+#: Default tag factory pre-configured with HTML5 void and unescaped
+#: elements. Use ``html.<tag>(...)`` or ``html["<tag>"](...)`` to
+#: build elements.
 html = HTML(
     {
         # Void elements
@@ -460,6 +565,16 @@ html = HTML(
 
 
 class Page:
+    """Top-level HTML5 document.
+
+    Combines a ``<!doctype html>`` preamble with an ``<html>``
+    element wrapping the supplied head and body. Extra keyword
+    arguments are forwarded to the ``<html>`` tag (e.g.
+    ``lang="en"``).
+    """
+
+    #: DOCTYPE declaration emitted before ``<html>``. Override on an
+    #: instance or subclass to render a non-HTML5 doctype.
     PREAMBLE: str = "<!doctype html>\n"
 
     def __init__(
@@ -474,11 +589,17 @@ class Page:
         self.html = html.html(self.head, self.body, *args, **kwargs)
 
     def to_html5(self, pretty: bool = False) -> str:
+        """Render the complete document, including ``PREAMBLE``."""
         return "".join((self.PREAMBLE, self.html.to_string(pretty=pretty)))
 
 
 class TagParser(HTMLParser):
-    """HTML parser that builds Tag objects from HTML strings."""
+    """HTML parser that builds :class:`Tag` objects from HTML strings.
+
+    Subclasses :class:`html.parser.HTMLParser` and accumulates a tree
+    in :attr:`root_elements`. Most users should call :func:`parse`
+    instead of using this class directly.
+    """
 
     def __init__(self) -> None:
         super().__init__(convert_charrefs=True)

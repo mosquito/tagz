@@ -36,7 +36,7 @@ classifiers = [
 [project.urls]
 Homepage = "https://github.com/mosquito/tagz"
 Repository = "https://github.com/mosquito/tagz"
-Documentation = "https://github.com/mosquito/tagz#readme"
+Documentation = "https://mosquito.github.io/tagz/"
 "Bug Tracker" = "https://github.com/mosquito/tagz/issues"
 
 [dependency-groups]
@@ -48,6 +48,19 @@ dev = [
     "markdown-pytest>=0.3.2",
     "pytest-benchmark>=5.0.1",
 ]
+docs = [
+    "sphinx>=7",
+    "furo>=2024.8",
+    "myst-parser>=4",
+    "sphinx-autodoc-typehints>=2",
+    "sphinx-copybutton>=0.5",
+    "sphinx-design>=0.6",
+    "sphinx-autobuild>=2024.10",
+    "sphinxcontrib-mermaid>=1",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests", "README.md", "docs"]
 
 [tool.hatch.build.targets.sdist]
 include = ["tagz.py"]
