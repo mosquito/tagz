@@ -131,6 +131,25 @@ class Tag:
 
         self.classes = classes  # type: ignore
 
+    def __copy__(self) -> "Tag":
+        """Shallow copy that bypasses ``__init__``.
+
+        Children that are tags are recursively copied so mutations on
+        the clone don't leak back. String children are shared (immutable).
+        Pre-escaped state is preserved as-is — strings are not
+        re-escaped on copy.
+        """
+        clone = object.__new__(self.__class__)
+        clone.name = self.name
+        clone.children = [
+            child if isinstance(child, str) else copy(child) for child in self.children
+        ]
+        clone.attributes = dict(self.attributes)
+        clone._classes = set(self._classes)
+        clone._void = self._void
+        clone._escaped = self._escaped
+        return clone
+
     @property
     def classes(self) -> AbstractSet[str]:
         """The element's CSS classes as a set of strings."""
@@ -455,11 +474,6 @@ class TagInstance(Tag):
             **attrs,
         )
 
-    def __copy__(self) -> "TagInstance":
-        children = tuple(
-            item if isinstance(item, str) else copy(item) for item in self.children
-        )
-        return self.__class__(*children, classes=copy(self.classes), **self.attributes)
 
 
 @lru_cache(None)
@@ -495,6 +509,7 @@ class HTML:
         tag_name = tag_name.lower().replace("_", "-")
         return create_tag_class(tag_name, **self.__defaults.get(tag_name, {}))
 
+    @lru_cache(maxsize=None)
     def __getattr__(self, tag_name: str) -> Type[TagInstance]:
         """Attribute-access shorthand for :meth:`__getitem__`."""
         return self[tag_name.replace("_", "-")]

@@ -288,6 +288,114 @@ def test_tag_copy():
     assert tag["name"] == "foo"
     assert clone["name"] == "bar"
 
+    unsafe = html.p("<x&y>")
+    assert str(copy(unsafe)) == "<p>&lt;x&amp;y&gt;</p>"
+    assert str(html.div(unsafe)) == "<div><p>&lt;x&amp;y&gt;</p></div>"
+
+
+def test_copy_does_not_double_escape_text_children(subtests):
+    with subtests.test("factory tag"):
+        tag = html.p("<x&y>")
+        expected = "<p>&lt;x&amp;y&gt;</p>"
+        assert str(tag) == expected
+        assert str(copy(tag)) == expected
+        assert str(html.div(tag)) == f"<div>{expected}</div>"
+
+    with subtests.test("base tag"):
+        tag = Tag("p", "<x&y>")
+        expected = "<p>&lt;x&amp;y&gt;</p>"
+        assert str(tag) == expected
+        assert str(copy(tag)) == expected
+        assert str(html.div(tag)) == f"<div>{expected}</div>"
+
+    with subtests.test("nested tags"):
+        tag = html.section(
+            html.p("<x&y>"),
+            html.span("a > b & c"),
+        )
+        expected = (
+            "<section><p>&lt;x&amp;y&gt;</p>"
+            "<span>a &gt; b &amp; c</span></section>"
+        )
+        assert str(tag) == expected
+        assert str(copy(tag)) == expected
+        assert str(html.div(tag)) == f"<div>{expected}</div>"
+
+    with subtests.test("parsed entity text"):
+        tag = parse("<p>&lt;x&amp;y&gt;</p>")
+        expected = "<p>&lt;x&amp;y&gt;</p>"
+        assert str(tag) == expected
+        assert str(copy(tag)) == expected
+        assert str(html.div(tag)) == f"<div>{expected}</div>"
+
+
+def test_copy_does_not_double_escape_fragment_children(subtests):
+    with subtests.test("fragment"):
+        fragment = Fragment("<x&y>", html.span("<a&b>"))
+        expected = "&lt;x&amp;y&gt;<span>&lt;a&amp;b&gt;</span>"
+        assert str(fragment) == expected
+        assert str(copy(fragment)) == expected
+        assert str(html.div(fragment)) == f"<div>{expected}</div>"
+
+    with subtests.test("nested fragment"):
+        fragment = Fragment(
+            html.p("<x&y>"),
+            Fragment("<a&b>", html.strong("1 < 2")),
+        )
+        expected = (
+            "<p>&lt;x&amp;y&gt;</p>"
+            "&lt;a&amp;b&gt;<strong>1 &lt; 2</strong>"
+        )
+        assert str(fragment) == expected
+        assert str(copy(fragment)) == expected
+        assert str(html.div(fragment)) == f"<div>{expected}</div>"
+
+
+def test_copy_does_not_double_escape_classes_or_attributes(subtests):
+    with subtests.test("classes"):
+        tag = html.div(classes=["a&b", "<danger>"])
+        expected = '<div class="&lt;danger&gt; a&amp;b"></div>'
+        assert str(tag) == expected
+        assert str(copy(tag)) == expected
+        assert str(html.section(tag)) == f"<section>{expected}</section>"
+
+    with subtests.test("attribute values"):
+        tag = html.a(
+            "link",
+            href="/search?q=<x>&sort=a&b",
+            title='"quoted" & <unsafe>',
+        )
+        expected = (
+            '<a href="/search?q=&lt;x&gt;&amp;sort=a&amp;b" '
+            'title="&quot;quoted&quot; &amp; &lt;unsafe&gt;">link</a>'
+        )
+        assert str(tag) == expected
+        assert str(copy(tag)) == expected
+        assert str(html.div(tag)) == f"<div>{expected}</div>"
+
+
+def test_copy_preserves_unescaped_content(subtests):
+    with subtests.test("raw"):
+        raw = Raw("<span>raw & trusted</span>")
+        expected = "<span>raw & trusted</span>"
+        assert str(raw) == expected
+        assert str(copy(raw)) == expected
+        assert str(html.div(raw)) == f"<div>{expected}</div>"
+
+    with subtests.test("script"):
+        script = html.script("if (a < b && c > d) { console.log('&'); }")
+        expected = "<script>if (a < b && c > d) { console.log('&'); }</script>"
+        assert str(script) == expected
+        assert str(copy(script)) == expected
+        assert str(html.div(script)) == f"<div>{expected}</div>"
+
+    with subtests.test("style"):
+        style = html.style("body > main { color: red; }")
+        expected = "<style>body > main { color: red; }</style>"
+        assert str(style) == expected
+        assert str(copy(style)) == expected
+        assert str(html.div(style)) == f"<div>{expected}</div>"
+
 
 def test_void_tags():
     br = html.br()
