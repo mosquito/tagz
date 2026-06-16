@@ -1,4 +1,4 @@
-<svg width="156" height="72" viewBox="0 0 156 72" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="tagz">
+<svg width="120" height="72" viewBox="0 0 120 72" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="tagz">
   <g transform="translate(0,4)" stroke-linecap="round" stroke-linejoin="round" fill="none">
     <g stroke="#ffffff" stroke-width="10">
       <path d="M22 6 L6 32 L22 58"/>
@@ -17,7 +17,4 @@
       <path d="M52 46 Q60 56 68 46"/>
     </g>
   </g>
-  <rect x="128" y="2" width="22" height="68" rx="3" fill="#8b5cf6" stroke="#ffffff" stroke-width="3">
-    <animate attributeName="opacity" values="1;1;0;0" keyTimes="0;0.5;0.5;1" dur="1.06s" repeatCount="indefinite"/>
-  </rect>
 </svg>
