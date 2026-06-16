@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="https://raw.githubusercontent.com/mosquito/tagz/master/docs/_static/logo.svg" alt="tagz" width="312">
+</p>
+
 [![tests](https://github.com/mosquito/tagz/actions/workflows/tests.yml/badge.svg)](https://github.com/mosquito/tagz/actions/workflows/tests.yml)
 [![Coveralls](https://coveralls.io/repos/github/mosquito/tagz/badge.svg?branch=master)](https://coveralls.io/github/mosquito/tagz?branch=master)
 [![Latest Version](https://img.shields.io/pypi/v/tagz.svg)](https://pypi.python.org/pypi/tagz/)

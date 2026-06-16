@@ -30,11 +30,13 @@ myst_heading_anchors = 3
 
 html_theme = "furo"
 html_title = "tagz"
+html_static_path = ["_static"]
+html_logo = "_static/logo.svg"
 html_theme_options = {
     "source_repository": "https://github.com/mosquito/tagz",
     "source_branch": "master",
     "source_directory": "docs/",
-    "sidebar_hide_name": False,
+    "sidebar_hide_name": True,
 }
 
 intersphinx_mapping = {"python": ("https://docs.python.org/3", None)}
