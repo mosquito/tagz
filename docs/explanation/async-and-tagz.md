@@ -1,124 +1,137 @@
 # Async and `tagz`
 
-`tagz` has no async rendering API. There is no `await tag.to_html5()`,
-no `aiter_chunk()`, no `aresolve()`. This is intentional. This page
-explains the reasoning so the question doesn't come up again — and
-walks through the pattern you should use instead.
+`tagz` ships in two flavours behind two import lines.
 
-## The recommended pattern
+- **`tagz`** — the core, sync-only module. Tree construction is sync,
+  rendering is sync, no `asyncio` import anywhere. Minimal pip-install.
+- **`tagz.aio`** — the async mirror. Same symbol names (`html`,
+  `Page`, `Fragment`, `Raw`, `Tag`, `Style`, `StyleSheet`, `parse`, …),
+  same construction semantics, but every render method is `async`.
+  Children and attributes may additionally be coroutines, awaitables,
+  async-def functions, and async iterables.
 
-Resolve async data **before** building the tree. The tree itself
-stays synchronous and declarative.
+Migration is mechanical: change the import line and add `await` /
+`async for` at the render call sites.
 
-<!-- name: test_async_recommended -->
+<!-- name: async test_async_explainer_mirror -->
 ```python
-import asyncio
-from tagz import html, Page
+# Sync — exactly as before
+from tagz import html as sync_html, Page as SyncPage
+page = SyncPage(body_element=sync_html.body(sync_html.h1("Hi")))
+print(page.to_html5())
 
-async def fetch_user_name() -> str:
-    await asyncio.sleep(0)
+# Async — same shape, different import
+from tagz.aio import html, Page
+
+async def fetch_name():
     return "Ada"
 
-async def fetch_posts() -> list[str]:
-    await asyncio.sleep(0)
-    return ["First post", "Second post"]
-
-async def render() -> str:
-    # 1. Pull async data first — concurrently if you like.
-    name, posts = await asyncio.gather(fetch_user_name(), fetch_posts())
-
-    # 2. Build the tree from plain values.
-    page = Page(
-        body_element=html.body(
-            html.h1(f"Hello, {name}"),
-            html.ul(*(html.li(p) for p in posts)),
-        ),
-        head_elements=(html.title(f"{name}'s page"),),
-    )
-
-    # 3. Render synchronously.
-    return page.to_html5()
-
-assert "Hello, Ada" in asyncio.run(render())
+page = Page(body_element=html.body(html.h1(fetch_name())))
+out = await page.to_html5()
+assert "<!doctype html>" in out
+assert "Ada" in out
 ```
 
-## Why not an async render path?
+## What counts as an async value
 
-Several design forces line up the same way.
+In the async build, `children` and attribute `value`s may also be:
 
-### 1. Coroutines are one-shot
+- a **coroutine object** (`fetch_user()`) — one-shot, awaited inline;
+- an arbitrary **awaitable** (`asyncio.Future`, `asyncio.Task`,
+  custom `__await__`);
+- an **async-def function** (`fetch_user`) — re-callable across
+  renders, recommended for trees you render more than once;
+- an **async iterable** (`async def gen(): yield ...`) — items
+  rendered in iteration order, each may itself be async.
 
-`async def f(): ...; c = f()` produces a coroutine you can only
-`await` once. `tagz` calls children per-render — so an async child
-would work on the first render and crash on the second.
+The renderer materialises these recursively: an async value that
+resolves to another async value gets awaited again, until a concrete
+`Tag` / `str` falls out.
 
-The only way to make this safe is to **mutate** the tree on first
-render, replacing the coroutine with its result. Now `str(tag)`
-sometimes mutates state and sometimes doesn't, depending on whether
-async children are present. That's a surprising and dangerous API.
+## Re-render and one-shot coroutines
 
-### 2. Rendering should not do I/O
+Coroutine objects can only be awaited once. The first render exhausts
+them; the second render surfaces a clear error:
 
-Today's mental model is dead simple: building a tag is cheap, and
-rendering is CPU-only string concatenation. If render-time can `await`
-arbitrary coroutines, render-time can:
-
-- raise network errors,
-- hang on a slow DB,
-- take time proportional to whatever your async callable does.
-
-You no longer know when `str(page)` will return. Worse, it may now
-*time out* — and the call site usually doesn't know to handle that.
-
-### 3. It breaks the sync API
-
-Library users want `print(page.to_html5())` to keep working in
-notebooks, scripts, and FastAPI handlers. If `tagz` adds an
-async-only path, you can no longer migrate a Tag back-and-forth.
-Code that took a Tag has to be re-audited for whether it might
-encounter async children.
-
-### 4. You don't get concurrency for free
-
-A naive async render walks the tree in document order, awaiting each
-async child sequentially. Total render time is the **sum** of every
-await — no faster than `asyncio.gather()`-ing the same data outside
-the tree. To get real concurrency you'd add a pre-resolve pass that
-gathers all coroutines first… which is exactly the recommended
-pattern, just shipped inside the library at the cost of all the
-problems above.
-
-## What if I really want lazy data fetching?
-
-Use a synchronous callable that does the fetch eagerly outside the
-event loop is a non-starter inside async code, but inside sync code
-you can use `tagz`'s existing callable-child machinery freely — see
-[Callables and laziness](callables-and-laziness.md).
-
-If you're in async code and the data really must be lazy, write a
-small helper that resolves the tree:
-
-<!-- name: test_async_helper_pattern -->
+<!-- name: async test_async_explainer_one_shot -->
 ```python
-import asyncio
-from tagz import html
+import pytest
+from tagz.aio import html
 
-async def resolve_async(value):
-    # Helper: accept either a value or a coroutine returning a value.
-    if asyncio.iscoroutine(value):
-        return await value
-    return value
+async def fetch_name():
+    return "Ada"
 
-async def build_card(user_id: int):
-    name_coro = asyncio.sleep(0, result=f"user-{user_id}")
-    name = await resolve_async(name_coro)
-    return html.div(html.strong(name))
+tag = html.div(fetch_name())   # raw coroutine — one-shot
+await tag.to_string()          # ok
 
-card = asyncio.run(build_card(7))
-assert str(card) == "<div><strong>user-7</strong></div>"
+with pytest.raises(RuntimeError, match="already awaited"):
+    await tag.to_string()      # boom
+
+# Pass the function itself for trees that render more than once:
+tag = html.div(fetch_name)
+out1 = await tag.to_string()
+out2 = await tag.to_string()
+assert out1 == out2 == "<div>Ada</div>"
 ```
 
-## How-to
+## Concurrency
 
+The async renderer awaits in **document order** without spawning
+background tasks. Total render time is the sum of all `await`s along
+the way.
+
+If you want sibling fetches to overlap, **start the tasks yourself**
+before placing them in the tree. `asyncio.Task` is an awaitable, so
+the renderer is happy to consume it — by the time the renderer
+reaches the task, the work is usually already done.
+
+<!-- name: async test_async_explainer_concurrent -->
+```python
+import asyncio, time
+from tagz.aio import html
+
+async def slow(label, delay=0.05):
+    await asyncio.sleep(delay)
+    return label
+
+t0 = time.perf_counter()
+# Three Tasks running concurrently, then handed to the renderer.
+tasks = [asyncio.create_task(slow(f"t{i}")) for i in range(3)]
+tag = html.div(*(html.p(t) for t in tasks))
+out = await tag.to_string()
+elapsed = time.perf_counter() - t0
+
+assert "t0" in out and "t2" in out
+assert elapsed < 0.15   # three × 50ms overlapped
+```
+
+Putting the concurrency primitive in the user's hands keeps the
+library's mental model honest: rendering is just I/O on the values
+you put in. If you need parallel fetches, you ask for them
+explicitly.
+
+## Mixing sync and async trees
+
+A `tagz.aio.html.div(...)` may contain plain `tagz.html.span(...)`
+children — the async renderer recurses through them as into any
+sync subtree. The reverse — putting an async tag inside a sync tag
+and calling sync `str(tag)` — produces an unawaited coroutine in the
+output, which is virtually always a bug. Build the root with
+`tagz.aio` whenever any branch may contain async values.
+
+## What's deliberately not in the box
+
+- **No magic eager scheduling** of children when the tree is built.
+  Coroutines only run when the renderer reaches them.
+- **No two-pass prefetch** (`tag.aresolve()` and similar). The
+  streaming-in-document-order model is the only render mode.
+- **No `__await__` on `Tag`**. The render methods are explicit:
+  `to_string`, `to_html5`, `iter_chunk`, `iter_lines`, `iter_string`.
+
+## Where to next?
+
+- [Stream HTML to a socket asynchronously](../how-to/streaming-async-html.md) —
+  the recipe form.
 - [Pre-resolve async data](../how-to/prefetch-async-data.md) — the
-  recipe form of the pattern above.
+  earlier pattern (resolve `await` outside the tree) still works and
+  is sometimes the right tool.

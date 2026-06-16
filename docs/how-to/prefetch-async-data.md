@@ -8,51 +8,52 @@ declarative, not a chain of `await`s.
 `asyncio.gather()` — and build the tree from plain values. The
 render itself stays synchronous.
 
-<!-- name: test_prefetch_async_basic -->
+<!-- name: async test_prefetch_async_basic -->
 ```python
 import asyncio
 from tagz import html, Page
 
 async def fetch_user():
-    await asyncio.sleep(0)
     return {"name": "Ada", "email": "ada@example.com"}
 
 async def fetch_posts():
-    await asyncio.sleep(0)
     return [{"title": "First"}, {"title": "Second"}]
 
-async def render():
-    user, posts = await asyncio.gather(fetch_user(), fetch_posts())
+user, posts = await asyncio.gather(fetch_user(), fetch_posts())
 
-    return Page(
-        body_element=html.body(
-            html.h1(user["name"]),
-            html.p(user["email"]),
-            html.ul(*(html.li(p["title"]) for p in posts)),
-        ),
-        head_elements=(html.title(user["name"]),),
-    ).to_html5()
+out = Page(
+    body_element=html.body(
+        html.h1(user["name"]),
+        html.p(user["email"]),
+        html.ul(*(html.li(p["title"]) for p in posts)),
+    ),
+    head_elements=(html.title(user["name"]),),
+).to_html5()
 
-out = asyncio.run(render())
 assert "Ada" in out
 assert "ada@example.com" in out
 assert "<li>First</li>" in out
 ```
 
-## Why not a callable returning a coroutine?
+## When to pre-resolve vs use `tagz.aio`
 
-A callable child runs every render; a coroutine can only be awaited
-once. Putting an `async` function (or its coroutine) into the tree
-will *not* work — `tagz` doesn't `await` anything.
+Both patterns are supported.
 
-```python
-# NOT supported:
-html.div(fetch_user)         # callable returning coroutine
-html.div(fetch_user())       # coroutine object
-```
+- **Pre-resolve outside the tree** (this page): you await everything
+  before construction; the tree itself is plain data; the render is
+  sync. Simplest mental model. Best when fetches are few and you
+  already know exactly which ones you need.
+- **`tagz.aio`** (different import line): coroutines, awaitables,
+  async functions, and async iterables can live directly inside
+  `children` and attribute values. The render becomes `await`-able
+  and can be streamed via `iter_chunk`. Best when components want to
+  own their own data lookups, or when you want to stream bytes
+  before every fetch has completed.
 
-See [Async and tagz](../explanation/async-and-tagz.md) for the
-design discussion.
+For the `tagz.aio` recipe, see
+[Stream HTML asynchronously](streaming-async-html.md). For the
+design discussion, see
+[Async and tagz](../explanation/async-and-tagz.md).
 
 ## Pattern with FastAPI
 

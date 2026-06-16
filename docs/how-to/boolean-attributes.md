@@ -14,11 +14,11 @@ from tagz import html
 
 # checked=True → bare attribute
 on = html.input(type="checkbox", checked=True)
-assert str(on) == '<input checked type="checkbox"/>'
+assert on.to_string() == '<input checked type="checkbox"/>'
 
 # checked=False → attribute omitted
 off = html.input(type="checkbox", checked=False)
-assert str(off) == '<input type="checkbox"/>'
+assert off.to_string() == '<input type="checkbox"/>'
 ```
 
 ## Toggling at runtime
@@ -28,13 +28,13 @@ assert str(off) == '<input type="checkbox"/>'
 from tagz import html
 
 tag = html.button("Save", disabled=True)
-assert "disabled" in str(tag)
+assert "disabled" in tag.to_string()
 
 tag["disabled"] = False
-assert "disabled" not in str(tag)
+assert "disabled" not in tag.to_string()
 
 tag["disabled"] = True
-assert "disabled" in str(tag)
+assert "disabled" in tag.to_string()
 ```
 
 ## Combining with `None` for late-binding boolean
@@ -51,7 +51,7 @@ def autofocus_attr():
     return None  # always present
 
 tag = html.input(type="text", autofocus=autofocus_attr)
-assert str(tag) == '<input autofocus type="text"/>'
+assert tag.to_string() == '<input autofocus type="text"/>'
 ```
 
 ## See also

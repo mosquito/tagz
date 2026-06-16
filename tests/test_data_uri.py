@@ -1,5 +1,4 @@
 import base64
-import pytest
 from tagz import data_uri, open_data_uri
 
 

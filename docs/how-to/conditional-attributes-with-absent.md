@@ -18,10 +18,10 @@ def aria_expanded():
     return "true" if state["open"] else ABSENT
 
 panel = html.div("...", aria_expanded=aria_expanded)
-assert 'aria-expanded="true"' in str(panel)
+assert 'aria-expanded="true"' in panel.to_string()
 
 state["open"] = False
-assert "aria-expanded" not in str(panel)
+assert "aria-expanded" not in panel.to_string()
 ```
 
 ## Why a sentinel, not `None`?
@@ -53,8 +53,8 @@ def label_for(disabled: bool):
         disabled=None if disabled else ABSENT,
     )
 
-assert "disabled" in str(label_for(True))
-assert "disabled" not in str(label_for(False))
+assert "disabled" in label_for(True).to_string()
+assert "disabled" not in label_for(False).to_string()
 ```
 
 ## See also

@@ -28,9 +28,8 @@ assert sink.getvalue().decode("utf-8") == page.to_string()
 The render itself stays synchronous; you only need `await` for the
 write. `iter_chunk` returns a regular iterator, so:
 
-<!-- name: test_stream_to_socket_async -->
+<!-- name: async test_stream_to_socket_async -->
 ```python
-import asyncio
 from tagz import html
 
 async def write_to(stream, page, chunk_size=4096):
@@ -44,13 +43,11 @@ class FakeStream:
         self.buf = bytearray()
     def write(self, b): self.buf.extend(b)
 
-async def main():
-    page = html.div(html.p("hello"))
-    stream = FakeStream()
-    await write_to(stream, page)
-    return bytes(stream.buf)
+page = html.div(html.p("hello"))
+stream = FakeStream()
+await write_to(stream, page)
 
-assert asyncio.run(main()) == b"<div><p>hello</p></div>"
+assert bytes(stream.buf) == b"<div><p>hello</p></div>"
 ```
 
 ## ASGI / Starlette / FastAPI

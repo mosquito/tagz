@@ -17,7 +17,7 @@ from tagz import html
 assert html.div is html["div"]
 
 custom = html["my-element"]("hello")
-assert str(custom) == "<my-element>hello</my-element>"
+assert custom.to_string() == "<my-element>hello</my-element>"
 ```
 
 ## Underscores become hyphens
@@ -29,7 +29,7 @@ underscores in attribute names to hyphens.
 ```python
 from tagz import html
 
-assert str(html.my_custom_tag("x")) == "<my-custom-tag>x</my-custom-tag>"
+assert html.my_custom_tag("x").to_string() == "<my-custom-tag>x</my-custom-tag>"
 ```
 
 The same rule applies to attribute keyword arguments (`data_value` →
@@ -51,8 +51,8 @@ to them raises `ValueError`.
 ```python
 from tagz import html
 
-assert str(html.br()) == "<br/>"
-assert str(html.img(src="cat.png", alt="cat")) == '<img alt="cat" src="cat.png"/>'
+assert html.br().to_string() == "<br/>"
+assert html.img(src="cat.png", alt="cat").to_string() == '<img alt="cat" src="cat.png"/>'
 
 try:
     html.br("oops")
@@ -73,7 +73,7 @@ otherwise be mangled.
 from tagz import html
 
 snippet = html.script("if (a < b && c > 0) {}")
-assert str(snippet) == "<script>if (a < b && c > 0) {}</script>"
+assert snippet.to_string() == "<script>if (a < b && c > 0) {}</script>"
 ```
 
 See [The escaping model](../explanation/escaping-model.md) for the
@@ -92,5 +92,5 @@ from tagz import HTML
 # Define a brand-new factory that treats `mathml` as unescaped.
 custom = HTML({"mathml": {"__escaped__": False}})
 
-assert str(custom.mathml("a < b")) == "<mathml>a < b</mathml>"
+assert custom.mathml("a < b").to_string() == "<mathml>a < b</mathml>"
 ```

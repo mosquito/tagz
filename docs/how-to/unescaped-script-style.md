@@ -12,8 +12,8 @@ tags are created with escaping disabled.
 from tagz import html
 
 js = html.script("if (a < b && c > 0) console.log('<3');")
-assert "<" in str(js)
-assert "&lt;" not in str(js)
+assert "<" in js.to_string()
+assert "&lt;" not in js.to_string()
 ```
 
 <!-- name: test_unescaped_style -->
@@ -21,7 +21,7 @@ assert "&lt;" not in str(js)
 from tagz import html
 
 css = html.style("body > .parent { color: red; }")
-assert ">" in str(css)
+assert ">" in css.to_string()
 ```
 
 ## Embedding values
@@ -45,8 +45,8 @@ from tagz import html
 
 payload = {"name": "Ada"}
 tag = html.script(f"window.__data__ = {json.dumps(payload)};")
-assert "window.__data__" in str(tag)
-assert '"name": "Ada"' in str(tag)
+assert "window.__data__" in tag.to_string()
+assert '"name": "Ada"' in tag.to_string()
 ```
 
 For especially tricky payloads (containing `</script>` substrings),

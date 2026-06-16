@@ -23,7 +23,7 @@ src = data_uri(gif_bytes, media_type="image/gif")
 img = html.img(src=src, alt="dot")
 
 assert src.startswith("data:image/gif;base64,")
-assert 'alt="dot"' in str(img)
+assert 'alt="dot"' in img.to_string()
 ```
 
 ## From a file path

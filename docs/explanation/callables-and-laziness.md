@@ -41,11 +41,11 @@ tag = html.div(render_child)
 # Not yet called — construction is cheap.
 assert calls == []
 
-assert str(tag) == "<div>lazy content</div>"
+assert tag.to_string() == "<div>lazy content</div>"
 assert calls == [1]
 
 # Render again — runs again.
-str(tag)
+tag.to_string()
 assert calls == [1, 1]
 ```
 
@@ -61,10 +61,10 @@ def disabled_attr():
     return None if state["disabled"] else ABSENT
 
 button = html.button("Save", disabled=disabled_attr)
-assert str(button) == "<button>Save</button>"
+assert button.to_string() == "<button>Save</button>"
 
 state["disabled"] = True
-assert str(button) == "<button disabled>Save</button>"
+assert button.to_string() == "<button disabled>Save</button>"
 ```
 
 ## Why lazy at all?
@@ -94,8 +94,8 @@ def increment():
     return str(counter["n"])
 
 tag = html.div(increment)
-assert str(tag) == "<div>1</div>"
-assert str(tag) == "<div>2</div>"  # not idempotent!
+assert tag.to_string() == "<div>1</div>"
+assert tag.to_string() == "<div>2</div>"  # not idempotent!
 ```
 
 If you need a value computed once, compute it before the tree:
@@ -109,16 +109,21 @@ def expensive():
 
 value = expensive()        # pay once
 tag = html.div(value)      # pure data afterwards
-assert str(tag) == "<div>result</div>"
-assert str(tag) == "<div>result</div>"
+assert tag.to_string() == "<div>result</div>"
+assert tag.to_string() == "<div>result</div>"
 ```
 
 ## Callables and async
 
-A callable returning a coroutine **does not work** — `tagz` will not
-await it. See [Async and tagz](async-and-tagz.md) for the
-recommended pattern (`await` the value before placing it in the
-tree).
+In the sync core (`from tagz import ...`), a callable returning a
+coroutine **does not work** — sync `tagz` will not `await` it; the
+coroutine ends up rendered via `str()` and you get something like
+`<coroutine object ...>` in your output.
+
+The fix is the async mirror: `from tagz.aio import html` accepts
+async-def functions, coroutines, awaitables (Futures, Tasks), and
+async iterables directly as children and attribute values. See
+[Async and tagz](async-and-tagz.md) for the full contract.
 
 ## Related
 

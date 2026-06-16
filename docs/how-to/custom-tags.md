@@ -12,11 +12,11 @@ it to a hyphen.
 ```python
 from tagz import html
 
-assert str(html.my_card("hi")) == "<my-card>hi</my-card>"
+assert html.my_card("hi").to_string() == "<my-card>hi</my-card>"
 
 # Equivalent via subscript access:
 same = html["my-card"]("hi")
-assert str(same) == "<my-card>hi</my-card>"
+assert same.to_string() == "<my-card>hi</my-card>"
 ```
 
 ## Names with non-identifier characters
@@ -29,7 +29,7 @@ use the subscript form.
 from tagz import html
 
 ns = html["x:foo"]("ns content")
-assert str(ns) == "<x:foo>ns content</x:foo>"
+assert ns.to_string() == "<x:foo>ns content</x:foo>"
 ```
 
 ## Custom attributes
@@ -47,7 +47,7 @@ tag = html.div(
     data_value="42",
     aria_label="card",
 )
-out = str(tag)
+out = tag.to_string()
 assert 'data-value="42"' in out
 assert 'aria-label="card"' in out
 ```
@@ -64,5 +64,5 @@ from tagz import HTML
 
 custom = HTML({"my-card": {"__escaped__": False}})
 tag = custom.my_card("a < b")
-assert str(tag) == "<my-card>a < b</my-card>"
+assert tag.to_string() == "<my-card>a < b</my-card>"
 ```

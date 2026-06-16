@@ -21,7 +21,7 @@ def render_header():
         html.h2("Subtitle"),
     )
 
-assert str(render_header()) == "<h1>Title</h1><h2>Subtitle</h2>"
+assert render_header().to_string() == "<h1>Title</h1><h2>Subtitle</h2>"
 ```
 
 Fragments compose: pass one as a child of another tag and it renders
@@ -36,7 +36,7 @@ page = html.body(
     Fragment(html.p("A"), html.p("B")),
     html.footer("Bottom"),
 )
-assert str(page) == "<body><header>Top</header><p>A</p><p>B</p><footer>Bottom</footer></body>"
+assert page.to_string() == "<body><header>Top</header><p>A</p><p>B</p><footer>Bottom</footer></body>"
 ```
 
 ## `Raw` — verbatim HTML
@@ -51,7 +51,7 @@ from tagz import html, Raw
 # Trusted HTML fragment from elsewhere:
 snippet = "<em>fast</em> &amp; safe"
 container = html.p("Status: ", Raw(snippet))
-assert str(container) == "<p>Status: <em>fast</em> &amp; safe</p>"
+assert container.to_string() == "<p>Status: <em>fast</em> &amp; safe</p>"
 ```
 
 ## Which one do I want?

@@ -9,6 +9,7 @@ already know the basics — start with the
 
 assemble-page-in-parts
 stream-to-socket
+streaming-async-html
 csv-to-html-table
 embed-binary-with-data-uri
 lazy-children-with-callables
@@ -48,6 +49,8 @@ htmx-with-aiohttp
 ### I/O & streaming
 
 - [Stream HTML to a socket](stream-to-socket.md)
+- [Stream HTML asynchronously](streaming-async-html.md) — with
+  `tagz.aio`, for handlers that await DB/HTTP inline.
 - [Convert a CSV file to an HTML table](csv-to-html-table.md)
 - [Embed binary data with a `data:` URI](embed-binary-with-data-uri.md)
 

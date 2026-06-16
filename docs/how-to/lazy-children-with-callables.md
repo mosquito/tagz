@@ -17,9 +17,9 @@ now = {"value": "first"}
 
 tag = html.div(lambda: now["value"])
 
-assert str(tag) == "<div>first</div>"
+assert tag.to_string() == "<div>first</div>"
 now["value"] = "second"
-assert str(tag) == "<div>second</div>"
+assert tag.to_string() == "<div>second</div>"
 ```
 
 ## A tag-returning callable
@@ -32,7 +32,7 @@ def card():
     return html.div(html.h2("Title"), html.p("body"), classes=["card"])
 
 container = html.section(card)
-assert "<h2>Title</h2>" in str(container)
+assert "<h2>Title</h2>" in container.to_string()
 ```
 
 ## Useful with `functools.partial`
@@ -48,12 +48,12 @@ def fmt(value, prefix):
 row = html.div(
     partial(fmt, value=42, prefix="#"),
 )
-assert str(row) == "<div>#42</div>"
+assert row.to_string() == "<div>#42</div>"
 ```
 
 ## Things to remember
 
-- The callable runs **once per render**. Two `str(tag)` calls = two
+- The callable runs **once per render**. Two `tag.to_string()` calls = two
   invocations. Side effects compound.
 - A callable returning a string is HTML-escaped (unless inside
   `<script>`/`<style>`).

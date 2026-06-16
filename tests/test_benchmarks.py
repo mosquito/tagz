@@ -5,8 +5,7 @@ Run with: pytest tests/test_benchmarks.py -v
 Or with benchmark plugin: pytest tests/test_benchmarks.py --benchmark-only
 """
 
-import pytest
-from tagz import html, Fragment, Raw
+from tagz import html, Fragment
 from functools import partial
 
 
@@ -35,7 +34,7 @@ def test_benchmark_string_generation(benchmark):
     """Benchmark HTML string generation."""
     tag = html.div(*[html.p(f"Paragraph {i}") for i in range(100)])
 
-    result = benchmark(str, tag)
+    result = benchmark(tag.to_string)
     assert len(result) > 0
     assert result.startswith("<div>")
 
@@ -53,7 +52,7 @@ def test_benchmark_escaping(benchmark):
     """Benchmark HTML escaping."""
     tag = html.div(*[html.p("<script>alert('xss')</script>") for i in range(100)])
 
-    result = benchmark(str, tag)
+    result = benchmark(tag.to_string)
     # Content is escaped - check for escaped characters
     assert "&" in result  # Either &lt; or &amp; depending on escaping level
     assert len(result) > 1000  # Should have generated lots of HTML
@@ -63,7 +62,7 @@ def test_benchmark_fragment(benchmark):
     """Benchmark Fragment rendering."""
 
     def create_fragment():
-        return str(Fragment(*[html.p(f"P {i}") for i in range(100)]))
+        return Fragment(*[html.p(f"P {i}") for i in range(100)]).to_string()
 
     result = benchmark(create_fragment)
     assert len(result) > 0
@@ -95,9 +94,7 @@ def test_benchmark_callable_children(benchmark):
     """Benchmark tags with callable children."""
 
     def create_with_callables():
-        return html.div(
-            *[html.p(partial("Paragraph {}".format, i)) for i in range(100)]
-        )
+        return html.div(*[html.p(partial("Paragraph {}".format, i)) for i in range(100)])
 
     result = benchmark(create_with_callables)
     assert result.name == "div"
@@ -108,7 +105,7 @@ def test_benchmark_large_document(benchmark):
 
     def create_large_doc():
         tag = html.div(*[html.p(f"Paragraph {i}") for i in range(1000)])
-        return str(tag)
+        return tag.to_string()
 
     result = benchmark(create_large_doc)
     assert len(result) > 10000
@@ -122,22 +119,20 @@ def test_manual_benchmark_comparison():
     # Test 1: String children (optimized path)
     start = time.perf_counter()
     for _ in range(1000):
-        tag = html.div(*[html.p(f"Text {i}") for i in range(10)])
+        html.div(*[html.p(f"Text {i}") for i in range(10)])
     time_with_strings = (time.perf_counter() - start) * 1000
 
     # Test 2: Tag children (still copies)
     start = time.perf_counter()
     for _ in range(1000):
         paragraphs = [html.p(f"Text {i}") for i in range(10)]
-        tag = html.div(*paragraphs)
+        html.div(*paragraphs)
     time_with_tags = (time.perf_counter() - start) * 1000
 
-    print(f"\nManual Benchmark Results:")
+    print("\nManual Benchmark Results:")
     print(f"  With string children: {time_with_strings:.2f}ms")
     print(f"  With tag children: {time_with_tags:.2f}ms")
-    print(
-        f"  String optimization benefit: {((time_with_tags - time_with_strings) / time_with_tags * 100):.1f}%"
-    )
+    print(f"  String optimization benefit: {((time_with_tags - time_with_strings) / time_with_tags * 100):.1f}%")
 
     # String path should be faster or equal
     assert time_with_strings <= time_with_tags * 1.1  # Allow 10% variance
@@ -155,16 +150,16 @@ def test_copy_behavior():
     # Modifying p1 should not affect div1 or div2 (they have copies)
     p1.append(" modified")
 
-    assert str(p1) == "<p>test modified</p>"
-    assert str(div1) == "<div><p>test</p></div>"
-    assert str(div2) == "<div><p>test</p></div>"
+    assert p1.to_string() == "<p>test modified</p>"
+    assert div1.to_string() == "<div><p>test</p></div>"
+    assert div2.to_string() == "<div><p>test</p></div>"
 
     # Test 2: Copying a tag should still work
     original = html.div("text", html.p("paragraph"))
     copied = copy(original)
 
     assert original is not copied
-    assert str(original) == str(copied)
+    assert original.to_string() == copied.to_string()
 
     # Modifying copied should not affect original
     copied.append(html.span("added"))
@@ -181,7 +176,7 @@ def test_profile_hotspots():
     def workload():
         tags = [html.p(f"Paragraph {i}") for i in range(100)]
         tag = html.div(*tags)
-        return str(tag)
+        return tag.to_string()
 
     profiler = cProfile.Profile()
     profiler.enable()
@@ -219,7 +214,7 @@ def test_profile_large_document():
 
     def large_doc_workload():
         tag = html.div(*[html.p(f"Paragraph {i}") for i in range(1000)])
-        return str(tag)
+        return tag.to_string()
 
     # First, time it
     start = time.perf_counter()

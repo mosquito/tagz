@@ -113,4 +113,6 @@ Slots also stop accidental attribute typos from silently succeeding.
   contains them. This keeps trees cheap to copy and impossible to
   cycle.
 - **No event system.** `tagz` is rendering-only.
-- **No async render path.** See [Async and tagz](async-and-tagz.md).
+- **No async surface in `tagz` itself.** The sync core stays dependency-
+  free of `asyncio`. The async mirror lives in a separate module —
+  see [Async and tagz](async-and-tagz.md).

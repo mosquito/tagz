@@ -41,11 +41,11 @@ from tagz import html
 
 # Inside script/style: NOT escaped.
 js = html.script("if (a < b) console.log('<3');")
-assert "<" in str(js)
-assert "&lt;" not in str(js)
+assert "<" in js.to_string()
+assert "&lt;" not in js.to_string()
 
 css = html.style("body > .foo { color: red; }")
-assert ">" in str(css)
+assert ">" in css.to_string()
 ```
 
 Inside these tags, **you** are responsible for the content. If you
@@ -63,7 +63,7 @@ from tagz import Raw, html
 
 snippet = Raw("<em>verbatim</em>")
 container = html.div(snippet)
-assert str(container) == "<div><em>verbatim</em></div>"
+assert container.to_string() == "<div><em>verbatim</em></div>"
 ```
 
 Treat `Raw` exactly like `dangerouslySetInnerHTML` in React: every
@@ -85,19 +85,19 @@ from tagz import html, ABSENT
 
 # Boolean: present
 on = html.input(type="checkbox", checked=True)
-assert "checked" in str(on)
-assert 'checked="' not in str(on)  # no value
+assert "checked" in on.to_string()
+assert 'checked="' not in on.to_string()  # no value
 
 # Boolean: absent
 off = html.input(type="checkbox", checked=False)
-assert "checked" not in str(off)
+assert "checked" not in off.to_string()
 
 # ABSENT: conditional via callable
 def maybe_disabled(banned: bool):
     return None if banned else ABSENT
 
 tag = html.input(type="text", disabled=lambda: maybe_disabled(False))
-assert "disabled" not in str(tag)
+assert "disabled" not in tag.to_string()
 ```
 
 ## What `tagz` does not protect against

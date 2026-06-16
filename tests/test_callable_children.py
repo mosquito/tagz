@@ -1,4 +1,3 @@
-import pytest
 from html import escape
 from tagz import html, ABSENT
 
@@ -8,7 +7,7 @@ def test_callable_child_str():
         return "hello"
 
     tag = html.div(child)
-    assert str(tag) == "<div>hello</div>"
+    assert tag.to_string() == "<div>hello</div>"
 
 
 def test_callable_child_tag():
@@ -16,7 +15,7 @@ def test_callable_child_tag():
         return html.span("world")
 
     tag = html.div(child)
-    assert str(tag) == "<div><span>world</span></div>"
+    assert tag.to_string() == "<div><span>world</span></div>"
 
 
 def test_append_callable():
@@ -25,7 +24,7 @@ def test_append_callable():
 
     tag = html.div()
     tag.append(child)
-    assert str(tag) == "<div>foo</div>"
+    assert tag.to_string() == "<div>foo</div>"
 
 
 def test_single_evaluation():
@@ -36,7 +35,7 @@ def test_single_evaluation():
         return "once"
 
     tag = html.div(child)
-    result = str(tag)
+    result = tag.to_string()
     assert result == "<div>once</div>"
     assert calls == [1], "Callable child should be evaluated only once"
 
@@ -51,11 +50,9 @@ def test_callable_attribute_value():
     tag = html.div(foo=value)
     # The callable is evaluated once and its result is escaped
     expected = f'<div foo="{escape("bar", quote=True)}"></div>'
-    result = str(tag)
+    result = tag.to_string()
     assert result == expected
-    assert calls == [1], (
-        "Attribute value callback should be evaluated, and result escaped"
-    )
+    assert calls == [1], "Attribute value callback should be evaluated, and result escaped"
 
 
 def test_callable_attribute_and_child():
@@ -73,7 +70,7 @@ def test_callable_attribute_and_child():
     tag = html.div(child, foo=attr)
     # The callable is evaluated once and its result is escaped
     expected = f'<div foo="{escape("attrval", quote=True)}">childval</div>'
-    result = str(tag)
+    result = tag.to_string()
     assert result == expected
     assert attr_calls == [1]
     assert child_calls == [1]
@@ -85,7 +82,7 @@ def test_attr_tag_not_supported():
 
     tag = html.div(foo=attr_tag)
     # Should render the repr of the Tag, not HTML, and escape it
-    result = str(tag)
+    result = tag.to_string()
     assert "<span" not in result
     assert 'foo="' in result
     assert "&lt;" in result and "&gt;" in result
@@ -99,13 +96,13 @@ def test_attribute_absent():
         return "value" if present else ABSENT
 
     tag = html.div(test=attr)
-    assert str(tag) == '<div test="value"></div>'
+    assert tag.to_string() == '<div test="value"></div>'
 
     present = False
-    assert str(tag) == "<div></div>"
+    assert tag.to_string() == "<div></div>"
 
     present = True
-    assert str(tag) == '<div test="value"></div>'
+    assert tag.to_string() == '<div test="value"></div>'
 
 
 def test_callable_children_escape():
@@ -113,4 +110,4 @@ def test_callable_children_escape():
         return "<script>alert('xss');</script>"
 
     tag = html.div(child)
-    assert str(tag) == "<div>&lt;script&gt;alert(&#x27;xss&#x27;);&lt;/script&gt;</div>"
+    assert tag.to_string() == "<div>&lt;script&gt;alert(&#x27;xss&#x27;);&lt;/script&gt;</div>"
