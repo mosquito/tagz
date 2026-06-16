@@ -632,3 +632,25 @@ def test_copy_preserves_unescaped_content(runtime, subtests):
         assert render(style) == expected
         assert render(copy(style)) == expected
         assert render(tz.html.div(style)) == f"<div>{expected}</div>"
+
+
+# ---------------------------------------------------------------------------
+# html.<dunder> must raise AttributeError — sphinx-autodoc / pickle / IDE
+# introspection probes dunder attrs and would otherwise get fake tag classes.
+# ---------------------------------------------------------------------------
+
+
+def test_html_factory_rejects_dunders(runtime, subtests):
+    tz, _ = runtime
+    # `__class__` is bound on every object before `__getattr__` runs, so it's not in the list.
+    # The names here are the ones sphinx-autodoc / pickle / IDE introspection actually probe.
+    for name in ("__qualname__", "__name__", "__wrapped__", "_private"):
+        with subtests.test(name=name):
+            with pytest.raises(AttributeError):
+                getattr(tz.html, name)
+
+
+def test_html_factory_still_resolves_normal_tags(runtime):
+    tz, render = runtime
+    # Regression guard for the underscore filter: it must NOT block snake_case → hyphenated tag names.
+    assert render(tz.html.my_custom_tag("hi")) == "<my-custom-tag>hi</my-custom-tag>"

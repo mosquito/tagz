@@ -250,6 +250,10 @@ class HTMLBase:
         )
 
     def __getattr__(self, tag_name: str) -> type[Any]:
+        # Dunders and underscored attributes are NOT HTML tag names — let them raise so introspection
+        # tools (sphinx-autodoc, pickle, IDE hover, etc.) don't get fake tag classes back.
+        if tag_name.startswith("_"):
+            raise AttributeError(tag_name)
         cls = self[tag_name.replace("_", "-")]
         self.__dict__[tag_name] = cls
         return cls
