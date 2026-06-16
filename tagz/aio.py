@@ -1,7 +1,7 @@
 """Async mirror of :mod:`tagz`. Same symbols, async render - change the import line and add ``await``.
 
 Children and attributes may also be coroutines, awaitables, async-def functions, or async iterables.
-See :doc:`docs/explanation/async-and-tagz` for the contract.
+See :doc:`/explanation/async-and-tagz` for the contract.
 """
 
 from __future__ import annotations
