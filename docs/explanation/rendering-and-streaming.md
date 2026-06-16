@@ -15,6 +15,16 @@ the same HTML; they differ in **how the output reaches you**.
 All four share the same internal generator (`_to_string`), so output
 is identical byte-for-byte modulo formatting and chunk boundaries.
 
+:::{warning}
+**`str(tag)` is deprecated.** Use `tag.to_string()` explicitly.
+Calling `str()` on a `Tag` emits a `DeprecationWarning` and will be
+removed in a future release. In `tagz.aio` it already raises
+`TypeError` — async render is `await tag.to_string()`. The reason:
+`str()` is implicit and obscures the choice between sync and async
+rendering; explicit method calls make the intent obvious and let
+mypy catch sync-on-async mistakes.
+:::
+
 ## When to use which
 
 **Use `to_string()`** when the page is small (kilobytes), you want

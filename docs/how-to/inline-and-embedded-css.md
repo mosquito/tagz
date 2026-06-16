@@ -23,7 +23,7 @@ box = html.div(
         border="1px solid #999",
     ),
 )
-out = str(box)
+out = box.to_string()
 assert 'style="' in out
 assert "padding: 0.5rem;" in out
 assert "background-color: #eef;" in out
@@ -43,7 +43,7 @@ block = html.style(StyleSheet({
     (".btn", ".btn-primary"): Style(border_radius="4px"),
 }))
 
-rendered = str(block)
+rendered = block.to_string()
 assert "body {margin: 0; padding: 0;}" in rendered
 assert ".btn, .btn-primary {border-radius: 4px;}" in rendered
 ```

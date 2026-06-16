@@ -28,5 +28,5 @@ async-and-tagz
   three iter-methods, what `pretty=True` does and doesn't promise.
 - **[Callables and laziness](callables-and-laziness.md)** — when
   callables run, how often, and what that means for side effects.
-- **[Async and `tagz`](async-and-tagz.md)** — why there is no
-  `await tag.to_html5()`, and what to do instead.
+- **[Async and `tagz`](async-and-tagz.md)** — the `tagz.aio` mirror
+  with async render and streaming via `iter_chunk` / `iter_lines`.

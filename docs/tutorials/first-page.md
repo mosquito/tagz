@@ -24,7 +24,7 @@ Start in a Python REPL or a fresh script.
 from tagz import html
 
 greeting = html.h1("Hello, world")
-assert str(greeting) == "<h1>Hello, world</h1>"
+assert greeting.to_string() == "<h1>Hello, world</h1>"
 ```
 
 Two things to notice:
@@ -48,7 +48,7 @@ card = html.div(
     classes=["card", "card-default"],
 )
 
-out = str(card)
+out = card.to_string()
 assert '<div class="card card-default">' in out
 assert "<strong>emphasis</strong>" in out
 ```

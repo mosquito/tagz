@@ -71,7 +71,7 @@ method, every option, with type signatures.
 :link-type: doc
 
 Understanding-oriented. The "why" — design decisions, the escaping
-model, callables and laziness, why there's no async render path.
+model, callables and laziness, and the `tagz.aio` streaming model.
 :::
 
 ::::

@@ -47,7 +47,7 @@ that replaces the button.
 from tagz import html
 
 def click_html() -> str:
-    return str(html.span("clicked!"))
+    return html.span("clicked!").to_string()
 
 assert click_html() == "<span>clicked!</span>"
 ```
@@ -76,7 +76,7 @@ async def index(request: web.Request) -> web.Response:
 
 
 async def click(request: web.Request) -> web.Response:
-    return web.Response(text=str(html.span("clicked!")), content_type="text/html")
+    return web.Response(text=html.span("clicked!").to_string(), content_type="text/html")
 
 
 app = web.Application()
@@ -107,7 +107,7 @@ side without a wrapping `<div>`.
 from tagz import Fragment, html
 
 def greet_form_html() -> str:
-    return str(Fragment(
+    return Fragment(
         html.form(
             html.label(
                 "Your name ",
@@ -119,7 +119,7 @@ def greet_form_html() -> str:
             hx_swap="innerHTML",
         ),
         html.div(id="greeting"),
-    ))
+    ).to_string()
 
 
 out = greet_form_html()
@@ -143,8 +143,8 @@ from tagz import html
 def greet_response_html(name: str) -> str:
     name = name.strip()
     if not name:
-        return str(html.span("Please enter a name."))
-    return str(html.p(f"Hello, {name}!"))
+        return html.span("Please enter a name.").to_string()
+    return html.p(f"Hello, {name}!").to_string()
 
 
 assert greet_response_html("Ada") == "<p>Hello, Ada!</p>"
@@ -170,7 +170,7 @@ async def greet(request: web.Request) -> web.Response:
         body = html.span("Please enter a name.")
     else:
         body = html.p(f"Hello, {name}!")
-    return web.Response(text=str(body), content_type="text/html")
+    return web.Response(text=body.to_string(), content_type="text/html")
 
 
 app = web.Application()
@@ -214,7 +214,7 @@ page_body = card(
     stats([("uptime (s)", 42), ("requests", 1337)]),
 )
 
-rendered = str(page_body)
+rendered = page_body.to_string()
 assert '<h3>Server stats</h3>' in rendered
 assert "<li>uptime (s): 42</li>" in rendered
 ```
@@ -244,7 +244,7 @@ STATE = {"counter": 0}
 
 
 def render_counter() -> str:
-    return str(Fragment(
+    return Fragment(
         html.span(str(STATE["counter"]), id="counter-value"),
         html.button(
             "−",
@@ -258,12 +258,12 @@ def render_counter() -> str:
             hx_target="#counter-value",
             hx_swap="outerHTML",
         ),
-    ))
+    ).to_string()
 
 
 def render_counter_value() -> str:
     # The fragment that replaces #counter-value after each click.
-    return str(html.span(str(STATE["counter"]), id="counter-value"))
+    return html.span(str(STATE["counter"]), id="counter-value").to_string()
 
 
 # Initial render
@@ -329,7 +329,7 @@ def htmx_response(body: str) -> web.Response:
     )
 
 
-resp = htmx_response(str(html.span("hi")))
+resp = htmx_response(html.span("hi").to_string())
 assert resp.content_type == "text/html"
 assert resp.headers["X-Content-Type-Options"] == "nosniff"
 ```
@@ -367,7 +367,7 @@ def secure_page_head():
     )
 
 
-rendered = "".join(str(t) for t in secure_page_head())
+rendered = "".join(t.to_string() for t in secure_page_head())
 # Single quotes are HTML-escaped inside attribute values — that's fine,
 # CSP parsers see the original character after the browser decodes it.
 assert "Content-Security-Policy" in rendered
@@ -404,7 +404,7 @@ def htmx_script_tag():
     )
 
 
-out = str(htmx_script_tag())
+out = htmx_script_tag().to_string()
 assert 'integrity="sha384-' in out
 assert 'crossorigin="anonymous"' in out
 ```
@@ -448,7 +448,7 @@ def htmx_config_meta():
     return html.meta(name="htmx-config", content=json.dumps(HTMX_CONFIG))
 
 
-out = str(htmx_config_meta())
+out = htmx_config_meta().to_string()
 # Double-quote entities are just the HTML-escape of the JSON's "
 # (the browser decodes before passing the value to htmx).
 assert "&quot;selfRequestsOnly&quot;: true" in out

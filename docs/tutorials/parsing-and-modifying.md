@@ -39,7 +39,7 @@ from tagz import parse, Fragment
 frag = parse("<p>One</p><p>Two</p>")
 assert isinstance(frag, Fragment)
 assert len(frag.children) == 2
-assert str(frag) == "<p>One</p><p>Two</p>"
+assert frag.to_string() == "<p>One</p><p>Two</p>"
 ```
 
 ## Step 3 — read a full document
@@ -59,8 +59,8 @@ source = """<!DOCTYPE html>
 
 result = parse(source)
 assert isinstance(result, Page)
-assert "Welcome" in str(result.body)
-assert "Demo" in str(result.head)
+assert "Welcome" in result.body.to_string()
+assert "Demo" in result.head.to_string()
 
 out = result.to_html5()
 assert out.startswith("<!DOCTYPE html>")
@@ -102,7 +102,7 @@ doc.children[0] = html.h1("New Title", classes=["accent"])
 # Add a footer.
 doc.append(html.footer("Updated"))
 
-out = str(doc)
+out = doc.to_string()
 assert "New Title" in out
 assert "Updated" in out
 assert 'class="accent"' in out

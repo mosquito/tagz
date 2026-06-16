@@ -1,6 +1,6 @@
 [project]
 name = "tagz"
-version = "0.7.0"
+version = "0.8.0"
 description = "A lightweight, type-safe Python library for building and parsing HTML documents programmatically without templates"
 authors = [{ name = "Dmitry Orlov", email = "orlovdl@gmail.com" }]
 requires-python = ">=3.10,<4"
@@ -41,14 +41,15 @@ Documentation = "https://mosquito.github.io/tagz/"
 
 [dependency-groups]
 dev = [
-    "mypy>=1.5.1,<2",
-    "pytest>=7.4.2,<8",
-    "pytest-cov>=4.1.0,<5",
-    "coveralls>=3.3.1,<4",
-    "markdown-pytest>=0.3.2",
-    "pytest-benchmark>=5.0.1",
+    "mypy",
+    "pytest",
+    "pytest-cov",
+    "pytest-asyncio",
+    "coveralls",
+    "markdown-pytest",
+    "pytest-benchmark",
     # Used by docs/how-to/htmx-with-aiohttp.md code blocks executed via markdown-pytest.
-    "aiohttp>=3.10",
+    "aiohttp",
 ]
 docs = [
     "sphinx>=7",
@@ -64,11 +65,18 @@ docs = [
 [tool.pytest.ini_options]
 testpaths = ["tests", "README.md", "docs"]
 
+[tool.ruff]
+target-version = "py310"
+line-length = 119
+
+[tool.ruff.lint]
+select = ["E", "F", "UP"]
+
 [tool.hatch.build.targets.sdist]
-include = ["tagz.py"]
+include = ["tagz"]
 
 [tool.hatch.build.targets.wheel]
-include = ["tagz.py"]
+include = ["tagz"]
 
 [build-system]
 requires = ["hatchling"]
@@ -89,5 +97,5 @@ warn_redundant_casts = true
 warn_unused_configs = true
 warn_unused_ignores = true
 files = [
-    "tagz.py",
+    "tagz",
 ]
